@@ -1,7 +1,7 @@
 {
   "name": "goseeky-code",
   "displayName": "Goseeky Code",
-  "description": "Goseeky AI coding assistant for VS Code powered by Sarvam AI",
+  "description": "Goseeky AI coding assistant for VS Code",
   "version": "0.0.1",
   "engines": {
     "vscode": "^1.90.0"
