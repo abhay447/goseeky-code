@@ -69,3 +69,8 @@ You can author your README using Visual Studio Code. Here are some useful editor
 * [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
 
 **Enjoy!**
+
+
+** TODO next **
+1. Store chat session history, support multiple sessions.
+2. Start work on context mgmt, poc with repo structure context mgmt .
