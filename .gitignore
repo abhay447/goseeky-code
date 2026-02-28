@@ -1,0 +1,47 @@
+# Build output
+out/
+build/
+dist/
+
+# Dependencies
+node_modules/
+
+# VS Code extension packaging
+*.vsix
+
+# TypeScript cache
+*.tsbuildinfo
+
+# Environment & secrets
+.env
+.env.local
+.env.*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# VS Code personal configs
+.vscode/settings.json
+.vscode/launch.json
+.vscode/tasks.json
+
+# Logs
+*.log
+npm-debug.log*
+
+# Test output
+.vscode-test/
+.vscode-test.mjs
+coverage/
+
+# Boilerplate
+vsc-extension-quickstart.md
+CHANGELOG.md
+
+# Backup files
+*.bkp
+package-bkp.json
+
+# Build script
+esbuild.js

@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <style>
+        body {
+            font-family: var(--vscode-font-family);
+            padding: 8px;
+            background: var(--vscode-sideBar-background);
+            color: var(--vscode-foreground);
+            font-size: 13px;
+        }
+
+        #toolbar {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 8px;
+            flex-wrap: wrap;
+        }
+
+        #toolbar button {
+            font-size: 11px;
+            padding: 3px 8px;
+        }
+
+        #file-info {
+            font-size: 11px;
+            color: var(--vscode-descriptionForeground);
+            margin-bottom: 6px;
+            padding: 4px;
+            background: var(--vscode-editor-inactiveSelectionBackground);
+            border-radius: 3px;
+            display: none;
+        }
+
+        #messages {
+            height: calc(100vh - 180px);
+            overflow-y: auto;
+            margin-bottom: 8px;
+        }
+
+        .msg {
+            margin: 8px 0;
+            padding: 8px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .user {
+            background: var(--vscode-input-background);
+            text-align: right;
+        }
+
+        .assistant {
+            background: var(--vscode-editor-inactiveSelectionBackground);
+        }
+
+        .error {
+            color: var(--vscode-errorForeground);
+        }
+
+        .system {
+            color: var(--vscode-descriptionForeground);
+            font-style: italic;
+            font-size: 11px;
+            text-align: center;
+        }
+
+        #input-row {
+            display: flex;
+            gap: 4px;
+        }
+
+        textarea {
+            flex: 1;
+            background: var(--vscode-input-background);
+            color: var(--vscode-input-foreground);
+            border: 1px solid var(--vscode-input-border);
+            padding: 6px;
+            border-radius: 4px;
+            resize: none;
+            font-family: inherit;
+        }
+
+        button {
+            background: var(--vscode-button-background);
+            color: var(--vscode-button-foreground);
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: var(--vscode-button-hoverBackground);
+        }
+
+        .apply-btn {
+            font-size: 11px;
+            margin-top: 4px;
+            padding: 3px 8px;
+        }
+
+        pre {
+            background: var(--vscode-editor-background);
+            padding: 8px;
+            border-radius: 4px;
+            overflow-x: auto;
+            position: relative;
+        }
+
+        code {
+            font-family: var(--vscode-editor-font-family);
+            font-size: 12px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="toolbar">
+        <button id="btn-read">📄 Read File</button>
+        <button id="btn-open">📂 Open File</button>
+        <button id="btn-list">🗂 List Files</button>
+        <button id="btn-selection">✂️ Selection</button>
+    </div>
+
+    <div id="file-info"></div>
+    <div id="messages"></div>
+
+    <div id="input-row">
+        <textarea id="input" rows="3"
+            placeholder="Ask about your code, request edits...&#10;(Shift+Enter for newline)"></textarea>
+        <button id="btn-send">Send</button>
+    </div>
+
+    <script>
+        const vscode = acquireVsCodeApi();
+        const messagesEl = document.getElementById('messages');
+        const inputEl = document.getElementById('input');
+        const fileInfoEl = document.getElementById('file-info');
+
+        document.getElementById('btn-read').addEventListener('click', () => {
+            vscode.postMessage({ type: 'readFile' });
+        });
+        document.getElementById('btn-open').addEventListener('click', () => {
+            vscode.postMessage({ type: 'openFile' });
+        });
+        document.getElementById('btn-list').addEventListener('click', () => {
+            vscode.postMessage({ type: 'listFiles' });
+        });
+        document.getElementById('btn-selection').addEventListener('click', () => {
+            addMessage('(Using selected text as context for next question)', 'system');
+            vscode.postMessage({ type: 'readFile' });
+        });
+        document.getElementById('btn-send').addEventListener('click', send);
+
+        inputEl.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                send();
+            }
+        });
+
+        function send() {
+            const text = inputEl.value.trim();
+            if (!text) return;
+            addMessage(text, 'user');
+            inputEl.value = '';
+            vscode.postMessage({ type: 'ask', text });
+        }
+
+        function addMessage(text, cls) {
+            const div = document.createElement('div');
+            div.className = 'msg ' + cls;
+
+            if (cls === 'assistant') {
+                div.innerHTML = renderMarkdown(text);
+                div.querySelectorAll('pre').forEach(pre => {
+                    const codeEl = pre.querySelector('code');
+                    const code = codeEl ? codeEl.textContent : null;
+                    if (code) {
+                        const confirmDiv = document.createElement('div');
+                        confirmDiv.style.cssText = 'display:none; margin-top:6px; gap:6px; align-items:center;';
+                        confirmDiv.innerHTML = '<span style="font-size:11px;">Replace entire file with this code?</span>';
+
+                        const yesBtn = document.createElement('button');
+                        yesBtn.className = 'apply-btn';
+                        yesBtn.textContent = '✅ Yes, Apply';
+                        yesBtn.addEventListener('click', () => {
+                            vscode.postMessage({ type: 'applyEdit', code });
+                            confirmDiv.style.display = 'none';
+                        });
+
+                        const noBtn = document.createElement('button');
+                        noBtn.className = 'apply-btn';
+                        noBtn.textContent = '❌ Cancel';
+                        noBtn.style.marginLeft = '4px';
+                        noBtn.addEventListener('click', () => {
+                            confirmDiv.style.display = 'none';
+                        });
+
+                        confirmDiv.appendChild(yesBtn);
+                        confirmDiv.appendChild(noBtn);
+
+                        const applyBtn = document.createElement('button');
+                        applyBtn.className = 'apply-btn';
+                        applyBtn.textContent = '⚡ Apply to File';
+                        applyBtn.addEventListener('click', () => {
+                            confirmDiv.style.display = confirmDiv.style.display === 'none' ? 'flex' : 'none';
+                        });
+
+                        pre.appendChild(applyBtn);
+                        pre.appendChild(confirmDiv);
+                    }
+                });
+            } else {
+                div.textContent = text;
+            }
+
+            messagesEl.appendChild(div);
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+        }
+
+        // ── applyReply now receives the full msg object ──────────────────
+        function applyReply(msg) {
+
+            // Auto-applied HIGH confidence — editor was updated already
+            if (msg.autoApplied) {
+                if (msg.text) addMessage(msg.text, 'assistant');
+                addMessage('⚡ High confidence — applied automatically!', 'system');
+                return;
+            }
+
+            // Edit with confidence tag — show Apply / Discard
+            if (msg.code && msg.confidence) {
+                if (msg.text) addMessage(msg.text, 'assistant');
+
+                const capturedCode = msg.code;
+
+                const div = document.createElement('div');
+                div.className = 'msg system';
+                div.textContent = msg.confidence === 'HIGH'
+                    ? '⚡ High confidence edit ready'
+                    : '⚠️ Low confidence — please review before applying';
+
+                const applyBtn = document.createElement('button');
+                applyBtn.className = 'apply-btn';
+                applyBtn.textContent = '✅ Apply';
+                applyBtn.addEventListener('click', () => {
+                    vscode.postMessage({ type: 'applyEdit', code: capturedCode });
+                    applyBtn.disabled = true;
+                    applyBtn.textContent = 'Applied!';
+                });
+
+                const discardBtn = document.createElement('button');
+                discardBtn.className = 'apply-btn';
+                discardBtn.style.marginLeft = '4px';
+                discardBtn.textContent = '❌ Discard';
+                discardBtn.addEventListener('click', () => {
+                    div.remove();
+                });
+
+                div.appendChild(document.createElement('br'));
+                div.appendChild(applyBtn);
+                div.appendChild(discardBtn);
+                messagesEl.appendChild(div);
+                messagesEl.scrollTop = messagesEl.scrollHeight;
+                return;
+            }
+
+            // Create new file
+            if (msg.createFile) {
+                if (msg.text) addMessage(msg.text, 'assistant');
+
+                const capturedFilename = msg.createFile.filename;
+                const capturedCode = msg.createFile.code;
+
+                const div = document.createElement('div');
+                div.className = 'msg system';
+                div.textContent = '📄 Sarvam wants to create: ' + capturedFilename;
+
+                const createBtn = document.createElement('button');
+                createBtn.className = 'apply-btn';
+                createBtn.textContent = '💾 Create ' + capturedFilename;
+                createBtn.addEventListener('click', () => {
+                    vscode.postMessage({ type: 'createFile', filename: capturedFilename, code: capturedCode });
+                    createBtn.disabled = true;
+                    createBtn.textContent = '✅ Creating...';
+                });
+
+                div.appendChild(document.createElement('br'));
+                div.appendChild(createBtn);
+                messagesEl.appendChild(div);
+                messagesEl.scrollTop = messagesEl.scrollHeight;
+                return;
+            }
+
+            // Plain reply
+            addMessage(msg.text, 'assistant');
+        }
+
+        function renderMarkdown(text) {
+            return text
+                .replace(/```(\w+)?\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
+                .replace(/`([^`]+)`/g, '<code>$1</code>')
+                .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\n/g, '<br>');
+        }
+
+        function showFileInfo(path) {
+            fileInfoEl.style.display = 'block';
+            fileInfoEl.textContent = '📄 Context: ' + path;
+        }
+
+        window.addEventListener('message', (e) => {
+            const msg = e.data;
+            if (msg.type === 'reply') applyReply(msg);  // pass full msg object
+            if (msg.type === 'error') addMessage('❌ Error: ' + msg.text, 'error');
+            if (msg.type === 'editApplied') addMessage('✅ Code applied! Check your editor.', 'system');
+            if (msg.type === 'fileContent') {
+                showFileInfo(msg.path);
+                addMessage('📄 Loaded: ' + msg.path, 'system');
+            }
+            if (msg.type === 'fileList') {
+                addMessage('📁 Workspace files:\n' + msg.files.join('\n'), 'assistant');
+            }
+        });
+    </script>
+</body>
+
+</html>

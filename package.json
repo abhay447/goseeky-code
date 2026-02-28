@@ -1,0 +1,106 @@
+{
+  "name": "sarvam-vscode",
+  "displayName": "Sarvam AI Assistant",
+  "description": "Sarvam AI agent for VS Code - Indic language support",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "AI"
+  ],
+  "activationEvents": [],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "sarvam-sidebar",
+          "title": "Sarvam AI",
+          "icon": "$(sparkle)"
+        }
+      ]
+    },
+    "views": {
+      "sarvam-sidebar": [
+        {
+          "type": "webview",
+          "id": "sarvam.chatView",
+          "name": "Sarvam AI Chat"
+        }
+      ]
+    },
+    "chatParticipants": [
+      {
+        "id": "sarvam.assistant",
+        "name": "sarvam",
+        "fullName": "Sarvam AI",
+        "description": "Ask Sarvam AI - supports Hindi, Kannada, Tamil & more",
+        "isSticky": true
+      }
+    ],
+    "commands": [
+      {
+        "command": "sarvam.ask",
+        "title": "Ask Sarvam AI",
+        "category": "Sarvam"
+      },
+      {
+        "command": "sarvam.explainCode",
+        "title": "Explain Selected Code",
+        "category": "Sarvam"
+      },
+      {
+        "command": "sarvam.setApiKey",
+        "title": "Set Sarvam API Key",
+        "category": "Sarvam"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "sarvam.explainCode",
+          "when": "editorHasSelection",
+          "group": "sarvam"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Sarvam AI",
+      "properties": {
+        "sarvam.language": {
+          "type": "string",
+          "default": "en-IN",
+          "enum": [
+            "en-IN",
+            "hi-IN",
+            "kn-IN",
+            "ta-IN",
+            "te-IN",
+            "bn-IN",
+            "gu-IN",
+            "mr-IN"
+          ],
+          "description": "Preferred response language"
+        },
+        "sarvam.temperature": {
+          "type": "number",
+          "default": 0.2,
+          "minimum": 0,
+          "maximum": 2,
+          "description": "Model temperature (0 = deterministic, 2 = creative)"
+        }
+      }
+    }
+  },
+  "scripts": {
+  "compile": "tsc -p ./ && cp -r src/webview out/webview",
+  "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^20.19.35",
+    "@types/vscode": "^1.90.0",
+    "typescript": "^5.4.0"
+  }
+}
