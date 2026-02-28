@@ -24,7 +24,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
   // Register sidebar webview
   context.subscriptions.push(
-    vscode.window.registerWebviewViewProvider("sarvam.chatView", {
+    vscode.window.registerWebviewViewProvider("goseeky-code.chatView", {
       resolveWebviewView(webviewView) {
         webviewView.webview.options = { enableScripts: true };
         webviewView.webview.html = getChatHtml(context, webviewView.webview);
@@ -45,7 +45,7 @@ export async function activate(context: vscode.ExtensionContext) {
               const client = sarvamClient; // capture non-null reference
               const fileContext = getCurrentFileContext();
               const systemPrompt = buildSystemPrompt(fileContext);
-              const config = vscode.workspace.getConfiguration("sarvam");
+              const config = vscode.workspace.getConfiguration("goseeky-code");
               const temperature = config.get<number>("temperature", 0.2);
 
               const reply = await sarvamClient.chat(
@@ -224,7 +224,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
   // ── Command: Set API Key ──────────────────────────────────────────────────
   context.subscriptions.push(
-    vscode.commands.registerCommand("sarvam.setApiKey", async () => {
+    vscode.commands.registerCommand("goseeky-code.setApiKey", async () => {
       const key = await vscode.window.showInputBox({
         prompt: "Enter your Sarvam AI API key",
         password: true,
@@ -240,7 +240,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
   // ── Command: Quick Ask ────────────────────────────────────────────────────
   context.subscriptions.push(
-    vscode.commands.registerCommand("sarvam.ask", async () => {
+    vscode.commands.registerCommand("goseeky-code.ask", async () => {
       if (!sarvamClient) {
         vscode.window.showErrorMessage("Set your Sarvam API key first!");
         await vscode.commands.executeCommand("sarvam.setApiKey");
@@ -274,7 +274,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
   // ── Command: Explain Selected Code ───────────────────────────────────────
   context.subscriptions.push(
-    vscode.commands.registerCommand("sarvam.explainCode", async () => {
+    vscode.commands.registerCommand("goseeky-code.explainCode", async () => {
       if (!sarvamClient) {
         vscode.window.showErrorMessage("Set your Sarvam API key first!");
         return;

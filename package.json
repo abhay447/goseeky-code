@@ -1,7 +1,7 @@
 {
-  "name": "sarvam-vscode",
-  "displayName": "Sarvam AI Assistant",
-  "description": "Sarvam AI agent for VS Code - Indic language support",
+  "name": "goseeky-code",
+  "displayName": "Goseeky Code",
+  "description": "Goseeky AI coding assistant for VS Code powered by Sarvam AI",
   "version": "0.0.1",
   "engines": {
     "vscode": "^1.90.0"
@@ -15,60 +15,51 @@
     "viewsContainers": {
       "activitybar": [
         {
-          "id": "sarvam-sidebar",
-          "title": "Sarvam AI",
+          "id": "goseeky-sidebar",
+          "title": "Goseeky Code",
           "icon": "$(sparkle)"
         }
       ]
     },
     "views": {
-      "sarvam-sidebar": [
+      "goseeky-sidebar": [
         {
           "type": "webview",
-          "id": "sarvam.chatView",
-          "name": "Sarvam AI Chat"
+          "id": "goseeky-code.chatView",
+          "name": "Goseeky Code"
         }
       ]
     },
-    "chatParticipants": [
-      {
-        "id": "sarvam.assistant",
-        "name": "sarvam",
-        "fullName": "Sarvam AI",
-        "description": "Ask Sarvam AI - supports Hindi, Kannada, Tamil & more",
-        "isSticky": true
-      }
-    ],
     "commands": [
       {
-        "command": "sarvam.ask",
-        "title": "Ask Sarvam AI",
-        "category": "Sarvam"
+        "command": "goseeky-code.ask",
+        "title": "Ask Goseeky AI",
+        "category": "Goseeky"
       },
       {
-        "command": "sarvam.explainCode",
+        "command": "goseeky-code.explainCode",
         "title": "Explain Selected Code",
-        "category": "Sarvam"
+        "category": "Goseeky"
       },
       {
-        "command": "sarvam.setApiKey",
+        "command": "goseeky-code.setApiKey",
         "title": "Set Sarvam API Key",
-        "category": "Sarvam"
+        "category": "Goseeky"
       }
     ],
     "menus": {
       "editor/context": [
         {
-          "command": "sarvam.explainCode",
+          "command": "goseeky-code.explainCode",
           "when": "editorHasSelection",
-          "group": "sarvam"
+          "group": "goseeky"
         }
       ]
     },
     "configuration": {
-      "title": "Sarvam AI",
+      "title": "Goseeky Code",
       "properties": {
-        "sarvam.language": {
+        "goseeky-code.language": {
           "type": "string",
           "default": "en-IN",
           "enum": [
@@ -83,7 +74,7 @@
           ],
           "description": "Preferred response language"
         },
-        "sarvam.temperature": {
+        "goseeky-code.temperature": {
           "type": "number",
           "default": 0.2,
           "minimum": 0,
@@ -94,8 +85,8 @@
     }
   },
   "scripts": {
-  "compile": "tsc -p ./ && cp -r src/webview out/webview",
-  "watch": "tsc -watch -p ./"
+    "compile": "tsc -p ./ && cp -r src/webview out/webview",
+    "watch": "tsc -watch -p ./"
   },
   "devDependencies": {
     "@types/mocha": "^10.0.10",
