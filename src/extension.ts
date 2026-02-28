@@ -1,18 +1,25 @@
 import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
-import { SarvamClient } from "./sarvamClient";
+import { AIProvider, SarvamProvider, GeminiProvider } from "./providers";
 
-let sarvamClient: SarvamClient | null = null;
+let activeProvider: AIProvider | null = null;
+let activeProviderName: "sarvam" | "gemini" = "sarvam";
 let lastActiveEditor: vscode.TextEditor | undefined;
 
 export async function activate(context: vscode.ExtensionContext) {
-  console.log("Sarvam AI extension activated");
+  console.log("Goseeky Code extension activated");
 
-  // Load saved API key
-  const savedKey = await context.secrets.get("sarvam.apiKey");
-  if (savedKey) {
-    sarvamClient = new SarvamClient(savedKey);
+  // Load saved keys on startup — use whichever is available
+  const sarvamKey = await context.secrets.get("goseeky.sarvam.apiKey");
+  const geminiKey = await context.secrets.get("goseeky.gemini.apiKey");
+
+  if (sarvamKey) {
+    activeProvider = new SarvamProvider(sarvamKey);
+    activeProviderName = "sarvam";
+  } else if (geminiKey) {
+    activeProvider = new GeminiProvider(geminiKey);
+    activeProviderName = "gemini";
   }
 
   // Track last active editor (webview steals focus)
@@ -22,7 +29,7 @@ export async function activate(context: vscode.ExtensionContext) {
     }
   }, null, context.subscriptions);
 
-  // Register sidebar webview
+  // ── Register sidebar webview ──────────────────────────────────────────────
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider("goseeky-code.chatView", {
       resolveWebviewView(webviewView) {
@@ -31,24 +38,73 @@ export async function activate(context: vscode.ExtensionContext) {
 
         webviewView.webview.onDidReceiveMessage(async (msg) => {
 
-          // ── Basic chat ──────────────────────────────────────────────────
-          if (msg.type === "ask") {
-            try {
-              if (!sarvamClient) {
-                webviewView.webview.postMessage({
-                  type: "error",
-                  text: "API key not set. Run 'Sarvam: Set API Key' from Command Palette."
-                });
-                return;
-              }
+          // ── Switch provider ───────────────────────────────────────────
+          if (msg.type === "switchProvider") {
+            const pick = await vscode.window.showQuickPick(
+              [
+                {
+                  label: "$(sparkle) Sarvam AI",
+                  description: activeProviderName === "sarvam" ? "● active" : "",
+                  detail: "sarvam-m — best for Indic languages",
+                  id: "sarvam"
+                },
+                {
+                  label: "$(globe) Gemini",
+                  description: activeProviderName === "gemini" ? "● active" : "",
+                  detail: "gemini-2.5-flash — Google's model",
+                  id: "gemini"
+                },
+              ],
+              { placeHolder: "Select AI provider" }
+            );
 
-              const client = sarvamClient; // capture non-null reference
+            if (!pick) return;
+
+            const key = await context.secrets.get(`goseeky.${pick.id}.apiKey`);
+            if (!key) {
+              const setNow = await vscode.window.showWarningMessage(
+                `No API key found for ${pick.id}. Set it now?`,
+                "Yes", "No"
+              );
+              if (setNow === "Yes") {
+                await vscode.commands.executeCommand("goseeky-code.setApiKey");
+              }
+              return;
+            }
+
+            activeProviderName = pick.id as "sarvam" | "gemini";
+            activeProvider = pick.id === "sarvam"
+              ? new SarvamProvider(key)
+              : new GeminiProvider(key);
+
+            // Now post directly — we are still inside resolveWebviewView scope
+            webviewView.webview.postMessage({
+              type: "providerChanged",
+              provider: activeProviderName
+            });
+
+            vscode.window.showInformationMessage(`✅ Switched to ${pick.id}`);
+          }
+
+          // ── Basic chat ────────────────────────────────────────────────
+          if (msg.type === "ask") {
+            if (!activeProvider) {
+              webviewView.webview.postMessage({
+                type: "error",
+                text: "No API key set. Run 'Goseeky: Set API Key' from Command Palette."
+              });
+              return;
+            }
+
+            const client = activeProvider;
+
+            try {
               const fileContext = getCurrentFileContext();
               const systemPrompt = buildSystemPrompt(fileContext);
               const config = vscode.workspace.getConfiguration("goseeky-code");
               const temperature = config.get<number>("temperature", 0.2);
 
-              const reply = await sarvamClient.chat(
+              const reply = await client.chat(
                 [
                   { role: "system", content: systemPrompt },
                   { role: "user", content: msg.text }
@@ -66,7 +122,6 @@ export async function activate(context: vscode.ExtensionContext) {
                 const cleanReply = reply.replace(/<edit-file[\s\S]*?<\/edit-file>/, "").trim();
 
                 if (confidence === "HIGH") {
-                  // Auto apply
                   const editor = vscode.window.activeTextEditor || lastActiveEditor;
                   if (editor) {
                     const edit = new vscode.WorkspaceEdit();
@@ -83,7 +138,6 @@ export async function activate(context: vscode.ExtensionContext) {
                       confidence: "HIGH"
                     });
                   } else {
-                    // No editor open, fall back to manual
                     webviewView.webview.postMessage({
                       type: "reply",
                       text: cleanReply,
@@ -93,7 +147,6 @@ export async function activate(context: vscode.ExtensionContext) {
                     });
                   }
                 } else {
-                  // LOW confidence — let user decide
                   webviewView.webview.postMessage({
                     type: "reply",
                     text: cleanReply,
@@ -129,7 +182,7 @@ export async function activate(context: vscode.ExtensionContext) {
             }
           }
 
-          // ── Read current file ───────────────────────────────────────────
+          // ── Read current file ─────────────────────────────────────────
           if (msg.type === "readFile") {
             const ctx = getCurrentFileContext();
             if (ctx) {
@@ -139,7 +192,7 @@ export async function activate(context: vscode.ExtensionContext) {
             }
           }
 
-          // ── Apply edit to current file ──────────────────────────────────
+          // ── Apply edit to current file ────────────────────────────────
           if (msg.type === "applyEdit") {
             const editor = vscode.window.activeTextEditor || lastActiveEditor;
 
@@ -176,7 +229,7 @@ export async function activate(context: vscode.ExtensionContext) {
             webviewView.webview.postMessage({ type: "editApplied" });
           }
 
-          // ── Create new file ─────────────────────────────────────────────
+          // ── Create new file ───────────────────────────────────────────
           if (msg.type === "createFile") {
             const uri = await vscode.window.showSaveDialog({
               defaultUri: vscode.Uri.joinPath(
@@ -194,7 +247,7 @@ export async function activate(context: vscode.ExtensionContext) {
             }
           }
 
-          // ── Open file picker ────────────────────────────────────────────
+          // ── Open file picker ──────────────────────────────────────────
           if (msg.type === "openFile") {
             const uris = await vscode.window.showOpenDialog({ canSelectMany: false });
             if (uris && uris[0]) {
@@ -210,7 +263,7 @@ export async function activate(context: vscode.ExtensionContext) {
             }
           }
 
-          // ── List workspace files ────────────────────────────────────────
+          // ── List workspace files ──────────────────────────────────────
           if (msg.type === "listFiles") {
             const files = await vscode.workspace.findFiles("**/*", "**/node_modules/**", 50);
             const names = files.map(f => vscode.workspace.asRelativePath(f));
@@ -225,45 +278,104 @@ export async function activate(context: vscode.ExtensionContext) {
   // ── Command: Set API Key ──────────────────────────────────────────────────
   context.subscriptions.push(
     vscode.commands.registerCommand("goseeky-code.setApiKey", async () => {
+      const provider = await vscode.window.showQuickPick(
+        [
+          { label: "$(sparkle) Sarvam AI", id: "sarvam", description: "Best for Indic languages" },
+          { label: "$(globe) Gemini", id: "gemini", description: "Google's Gemini 2.0 Flash" }
+        ],
+        { placeHolder: "Which provider's API key do you want to set?" }
+      );
+      if (!provider) return;
+
       const key = await vscode.window.showInputBox({
-        prompt: "Enter your Sarvam AI API key",
+        prompt: `Enter your ${provider.id} API key`,
         password: true,
-        placeHolder: "Get it from https://dashboard.sarvam.ai"
+        placeHolder: provider.id === "sarvam"
+          ? "Get it from https://dashboard.sarvam.ai"
+          : "Get it from https://aistudio.google.com"
       });
+
       if (key) {
-        await context.secrets.store("sarvam.apiKey", key);
-        sarvamClient = new SarvamClient(key);
-        vscode.window.showInformationMessage("✅ Sarvam API key saved!");
+        await context.secrets.store(`goseeky.${provider.id}.apiKey`, key);
+        activeProviderName = provider.id as "sarvam" | "gemini";
+        activeProvider = provider.id === "sarvam"
+          ? new SarvamProvider(key)
+          : new GeminiProvider(key);
+        vscode.window.showInformationMessage(`✅ ${provider.id} API key saved and activated!`);
       }
+    })
+  );
+
+  // ── Command: Switch Provider ──────────────────────────────────────────────
+  context.subscriptions.push(
+    vscode.commands.registerCommand("goseeky-code.switchProvider", async () => {
+      const pick = await vscode.window.showQuickPick(
+        [
+          {
+            label: "$(sparkle) Sarvam AI",
+            description: activeProviderName === "sarvam" ? "● active" : "",
+            detail: "sarvam-m — best for Indic languages",
+            id: "sarvam"
+          },
+          {
+            label: "$(globe) Gemini",
+            description: activeProviderName === "gemini" ? "● active" : "",
+            detail: "gemini-2.5-flash — Google's model",
+            id: "gemini"
+          },
+        ],
+        { placeHolder: "Select AI provider" }
+      );
+
+      if (!pick) return;
+
+      const key = await context.secrets.get(`goseeky.${pick.id}.apiKey`);
+      if (!key) {
+        const setNow = await vscode.window.showWarningMessage(
+          `No API key found for ${pick.id}. Set it now?`,
+          "Yes", "No"
+        );
+        if (setNow === "Yes") {
+          await vscode.commands.executeCommand("goseeky-code.setApiKey");
+        }
+        return;
+      }
+
+      activeProviderName = pick.id as "sarvam" | "gemini";
+      activeProvider = pick.id === "sarvam"
+        ? new SarvamProvider(key)
+        : new GeminiProvider(key);
+
+      vscode.window.showInformationMessage(`✅ Switched to ${pick.id}`);
     })
   );
 
   // ── Command: Quick Ask ────────────────────────────────────────────────────
   context.subscriptions.push(
     vscode.commands.registerCommand("goseeky-code.ask", async () => {
-      if (!sarvamClient) {
-        vscode.window.showErrorMessage("Set your Sarvam API key first!");
-        await vscode.commands.executeCommand("sarvam.setApiKey");
+      if (!activeProvider) {
+        vscode.window.showErrorMessage("Set your API key first!");
+        await vscode.commands.executeCommand("goseeky-code.setApiKey");
         return;
       }
 
       const question = await vscode.window.showInputBox({
-        prompt: "Ask Sarvam AI anything",
+        prompt: "Ask Goseeky AI anything",
         placeHolder: "e.g. 'Write a REST API in FastAPI' or 'REST API कैसे बनाएं?'"
       });
 
       if (!question) return;
 
+      const client = activeProvider;
       await vscode.window.withProgress(
-        { location: vscode.ProgressLocation.Notification, title: "Sarvam AI is thinking..." },
+        { location: vscode.ProgressLocation.Notification, title: "Goseeky AI is thinking..." },
         async () => {
-          const answer = await sarvamClient!.chat([
+          const answer = await client.chat([
             { role: "system", content: "You are a helpful coding assistant. Be concise." },
             { role: "user", content: question }
           ]);
-
           const doc = await vscode.workspace.openTextDocument({
-            content: `# Sarvam AI Response\n\n**Question:** ${question}\n\n---\n\n${answer}`,
+            content: `# Goseeky AI Response\n\n**Question:** ${question}\n\n---\n\n${answer}`,
             language: "markdown"
           });
           vscode.window.showTextDocument(doc);
@@ -275,8 +387,8 @@ export async function activate(context: vscode.ExtensionContext) {
   // ── Command: Explain Selected Code ───────────────────────────────────────
   context.subscriptions.push(
     vscode.commands.registerCommand("goseeky-code.explainCode", async () => {
-      if (!sarvamClient) {
-        vscode.window.showErrorMessage("Set your Sarvam API key first!");
+      if (!activeProvider) {
+        vscode.window.showErrorMessage("Set your API key first!");
         return;
       }
 
@@ -286,19 +398,19 @@ export async function activate(context: vscode.ExtensionContext) {
         return;
       }
 
-      const selection = editor.selection;
-      const code = editor.document.getText(selection);
+      const code = editor.document.getText(editor.selection);
       if (!code) {
         vscode.window.showWarningMessage("Please select some code first");
         return;
       }
 
       const lang = editor.document.languageId;
+      const client = activeProvider;
 
       await vscode.window.withProgress(
         { location: vscode.ProgressLocation.Notification, title: "Explaining code..." },
         async () => {
-          const explanation = await sarvamClient!.chat([
+          const explanation = await client.chat([
             {
               role: "system",
               content: "You are a code explainer. Explain the given code clearly with a line-by-line breakdown if needed."
@@ -308,7 +420,6 @@ export async function activate(context: vscode.ExtensionContext) {
               content: `Explain this ${lang} code:\n\`\`\`${lang}\n${code}\n\`\`\``
             }
           ]);
-
           const doc = await vscode.workspace.openTextDocument({
             content: `# Code Explanation\n\n\`\`\`${lang}\n${code}\n\`\`\`\n\n---\n\n${explanation}`,
             language: "markdown"
@@ -342,39 +453,31 @@ ${fileContext.content}
 ${fileContext.selection ? `\nSelected text:\n\`\`\`\n${fileContext.selection}\n\`\`\`` : ""}`
     : "No file is currently open.";
 
-  return `You are Sarvam, a helpful AI coding assistant integrated into VS Code.
-You can respond in English or any Indian language the user writes in.
+  return `You are Goseeky, a helpful AI coding assistant integrated into VS Code.
+You can respond in English or any Indian language the user writes in (Hindi, Kannada, Tamil, Telugu, Bengali, etc.).
 
 ${fileSection}
 
 IMPORTANT RULES:
-
-1. When asked to CREATE a new file, end your response with:
+- When the user asks you to CREATE a new file, end your response with this exact format:
 <create-file name="filename.ext">
 \`\`\`language
 code here
 \`\`\`
 </create-file>
 
-2. When editing the existing open file, wrap your code with a confidence tag:
+- When editing the existing open file, wrap your code with a confidence tag:
 <edit-file confidence="HIGH">
 \`\`\`language
 full updated code here
 \`\`\`
 </edit-file>
 
-Use confidence="HIGH" when:
-- The request is clear and unambiguous
-- You are replacing/adding a specific function or fix
-- The user says "fix", "add", "refactor", "update" something specific
+Use confidence="HIGH" when the request is clear and unambiguous.
+Use confidence="LOW" when the request is vague or you are unsure.
 
-Use confidence="LOW" when:
-- The request is vague or open-ended
-- You are unsure which part to change
-- The change could break other parts
-
-3. Always use code blocks with the correct language identifier.
-4. Be concise and practical.`;
+- Always use code blocks with the correct language identifier.
+- Be concise and practical.`;
 }
 
 function getChatHtml(context: vscode.ExtensionContext, webview: vscode.Webview): string {

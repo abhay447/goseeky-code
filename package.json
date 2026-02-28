@@ -45,6 +45,11 @@
         "command": "goseeky-code.setApiKey",
         "title": "Set Sarvam API Key",
         "category": "Goseeky"
+      },
+      {
+        "command": "goseeky-code.switchProvider",
+        "title": "Switch AI Provider",
+        "category": "Goseeky"
       }
     ],
     "menus": {

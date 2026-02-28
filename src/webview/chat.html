@@ -23,6 +23,12 @@
             padding: 3px 8px;
         }
 
+        #btn-switch {
+            margin-left: auto;
+            background: var(--vscode-badge-background);
+            color: var(--vscode-badge-foreground);
+        }
+
         #file-info {
             font-size: 11px;
             color: var(--vscode-descriptionForeground);
@@ -34,7 +40,7 @@
         }
 
         #messages {
-            height: calc(100vh - 180px);
+            height: calc(100vh - 190px);
             overflow-y: auto;
             margin-bottom: 8px;
         }
@@ -124,6 +130,7 @@
         <button id="btn-open">📂 Open File</button>
         <button id="btn-list">🗂 List Files</button>
         <button id="btn-selection">✂️ Selection</button>
+        <button id="btn-switch">🔄 <span id="provider-name">sarvam</span></button>
     </div>
 
     <div id="file-info"></div>
@@ -140,7 +147,9 @@
         const messagesEl = document.getElementById('messages');
         const inputEl = document.getElementById('input');
         const fileInfoEl = document.getElementById('file-info');
+        const providerNameEl = document.getElementById('provider-name');
 
+        // ── Toolbar buttons ───────────────────────────────────────────────
         document.getElementById('btn-read').addEventListener('click', () => {
             vscode.postMessage({ type: 'readFile' });
         });
@@ -154,6 +163,9 @@
             addMessage('(Using selected text as context for next question)', 'system');
             vscode.postMessage({ type: 'readFile' });
         });
+        document.getElementById('btn-switch').addEventListener('click', () => {
+            vscode.postMessage({ type: 'switchProvider' });
+        });
         document.getElementById('btn-send').addEventListener('click', send);
 
         inputEl.addEventListener('keydown', (e) => {
@@ -163,6 +175,7 @@
             }
         });
 
+        // ── Send message ──────────────────────────────────────────────────
         function send() {
             const text = inputEl.value.trim();
             if (!text) return;
@@ -171,6 +184,7 @@
             vscode.postMessage({ type: 'ask', text });
         }
 
+        // ── Add message to chat ───────────────────────────────────────────
         function addMessage(text, cls) {
             const div = document.createElement('div');
             div.className = 'msg ' + cls;
@@ -223,17 +237,17 @@
             messagesEl.scrollTop = messagesEl.scrollHeight;
         }
 
-        // ── applyReply now receives the full msg object ──────────────────
+        // ── Handle reply with confidence/createFile ───────────────────────
         function applyReply(msg) {
 
-            // Auto-applied HIGH confidence — editor was updated already
+            // Auto-applied HIGH confidence
             if (msg.autoApplied) {
                 if (msg.text) addMessage(msg.text, 'assistant');
                 addMessage('⚡ High confidence — applied automatically!', 'system');
                 return;
             }
 
-            // Edit with confidence tag — show Apply / Discard
+            // Edit with confidence tag
             if (msg.code && msg.confidence) {
                 if (msg.text) addMessage(msg.text, 'assistant');
 
@@ -279,7 +293,7 @@
 
                 const div = document.createElement('div');
                 div.className = 'msg system';
-                div.textContent = '📄 Sarvam wants to create: ' + capturedFilename;
+                div.textContent = '📄 Goseeky wants to create: ' + capturedFilename;
 
                 const createBtn = document.createElement('button');
                 createBtn.className = 'apply-btn';
@@ -301,6 +315,7 @@
             addMessage(msg.text, 'assistant');
         }
 
+        // ── Markdown renderer ─────────────────────────────────────────────
         function renderMarkdown(text) {
             return text
                 .replace(/```(\w+)?\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
@@ -314,17 +329,23 @@
             fileInfoEl.textContent = '📄 Context: ' + path;
         }
 
+        // ── Message handler ───────────────────────────────────────────────
         window.addEventListener('message', (e) => {
             const msg = e.data;
-            if (msg.type === 'reply') applyReply(msg);  // pass full msg object
+
+            if (msg.type === 'reply') applyReply(msg);
             if (msg.type === 'error') addMessage('❌ Error: ' + msg.text, 'error');
-            if (msg.type === 'editApplied') addMessage('✅ Code applied! Check your editor.', 'system');
+            if (msg.type === 'editApplied') addMessage('✅ Done! File saved and opened.', 'system');
             if (msg.type === 'fileContent') {
                 showFileInfo(msg.path);
                 addMessage('📄 Loaded: ' + msg.path, 'system');
             }
             if (msg.type === 'fileList') {
                 addMessage('📁 Workspace files:\n' + msg.files.join('\n'), 'assistant');
+            }
+            if (msg.type === 'providerChanged') {
+                providerNameEl.textContent = msg.provider;
+                addMessage('🔄 Switched to ' + msg.provider, 'system');
             }
         });
     </script>
