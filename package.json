@@ -90,7 +90,7 @@
     }
   },
   "scripts": {
-    "compile": "tsc -p ./ && cp -r src/webview out/webview",
+    "compile": "tsc -p ./ && cp -r src/webview/*.html out/webview/*.html",
     "watch": "tsc -watch -p ./"
   },
   "devDependencies": {
