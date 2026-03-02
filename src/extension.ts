@@ -199,53 +199,6 @@ export async function activate(context: vscode.ExtensionContext) {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function getCurrentFileContext() {
-  const editor = vscode.window.activeTextEditor || lastActiveEditor;
-  if (!editor) return null;
-  return {
-    path: editor.document.fileName,
-    content: editor.document.getText(),
-    language: editor.document.languageId,
-    selection: editor.document.getText(editor.selection) || null
-  };
-}
-
-function buildSystemPrompt(fileContext: ReturnType<typeof getCurrentFileContext>): string {
-  const fileSection = fileContext
-    ? `The user currently has this file open (${fileContext.language}):
-\`\`\`${fileContext.language}
-${fileContext.content}
-\`\`\`
-${fileContext.selection ? `\nSelected text:\n\`\`\`\n${fileContext.selection}\n\`\`\`` : ""}`
-    : "No file is currently open.";
-
-  return `You are Goseeky, a helpful AI coding assistant integrated into VS Code.
-You can respond in English or any Indian language the user writes in (Hindi, Kannada, Tamil, Telugu, Bengali, etc.).
-
-${fileSection}
-
-IMPORTANT RULES:
-- When the user asks you to CREATE a new file, end your response with this exact format:
-<create-file name="filename.ext">
-\`\`\`language
-code here
-\`\`\`
-</create-file>
-
-- When editing the existing open file, wrap your code with a confidence tag:
-<edit-file confidence="HIGH">
-\`\`\`language
-full updated code here
-\`\`\`
-</edit-file>
-
-Use confidence="HIGH" when the request is clear and unambiguous.
-Use confidence="LOW" when the request is vague or you are unsure.
-
-- Always use code blocks with the correct language identifier.
-- Be concise and practical.`;
-}
-
 function getChatHtml(context: vscode.ExtensionContext, webview: vscode.Webview): string {
   const htmlPath = path.join(context.extensionPath, "src", "webview", "chat.html");
   return fs.readFileSync(htmlPath, "utf8");
