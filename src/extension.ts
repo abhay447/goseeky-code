@@ -1,12 +1,13 @@
 import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
-import { AIProvider, SarvamProvider, GeminiProvider } from "./providers";
+import { AIProvider, SarvamProvider, GeminiProvider, ChatManager } from "./providers";
 import { handleMessage } from "./webview/webviewHandler";
 
 let activeProvider: AIProvider | null = null;
 let activeProviderName: "sarvam" | "gemini" = "sarvam";
 let lastActiveEditor: vscode.TextEditor | undefined;
+let chatManager: ChatManager = new ChatManager();
 
 export async function activate(context: vscode.ExtensionContext) {
   console.log("Goseeky Code extension activated");
@@ -36,7 +37,7 @@ export async function activate(context: vscode.ExtensionContext) {
       resolveWebviewView(webviewView) {
         webviewView.webview.options = { enableScripts: true };
         webviewView.webview.html = getChatHtml(context, webviewView.webview);
-        webviewView.webview.onDidReceiveMessage(async (msg) => handleMessage(activeProvider, activeProviderName, context, lastActiveEditor, webviewView, msg));
+        webviewView.webview.onDidReceiveMessage(async (msg) => handleMessage(activeProvider, chatManager, activeProviderName, context, lastActiveEditor, webviewView, msg));
       }
     })
   );
@@ -136,10 +137,10 @@ export async function activate(context: vscode.ExtensionContext) {
       await vscode.window.withProgress(
         { location: vscode.ProgressLocation.Notification, title: "Goseeky AI is thinking..." },
         async () => {
-          const answer = await client.chat([
+          const answer = await chatManager.chat(client,
             { role: "system", content: "You are a helpful coding assistant. Be concise." },
             { role: "user", content: question }
-          ]);
+          );
           const doc = await vscode.workspace.openTextDocument({
             content: `# Goseeky AI Response\n\n**Question:** ${question}\n\n---\n\n${answer}`,
             language: "markdown"
@@ -176,7 +177,7 @@ export async function activate(context: vscode.ExtensionContext) {
       await vscode.window.withProgress(
         { location: vscode.ProgressLocation.Notification, title: "Explaining code..." },
         async () => {
-          const explanation = await client.chat([
+          const explanation = await chatManager.chat(client,
             {
               role: "system",
               content: "You are a code explainer. Explain the given code clearly with a line-by-line breakdown if needed."
@@ -185,7 +186,7 @@ export async function activate(context: vscode.ExtensionContext) {
               role: "user",
               content: `Explain this ${lang} code:\n\`\`\`${lang}\n${code}\n\`\`\``
             }
-          ]);
+          );
           const doc = await vscode.workspace.openTextDocument({
             content: `# Code Explanation\n\n\`\`\`${lang}\n${code}\n\`\`\`\n\n---\n\n${explanation}`,
             language: "markdown"

@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
-import { AIProvider, GeminiProvider, SarvamProvider } from "../providers";
+import { AIProvider, ChatManager, GeminiProvider, SarvamProvider } from "../providers";
 
-export async function handleMessage(activeProvider: AIProvider | null, activeProviderName: String, context: vscode.ExtensionContext, lastActiveEditor: vscode.TextEditor | undefined, webviewView: vscode.WebviewView, msg: any) {
+export async function handleMessage(activeProvider: AIProvider | null, chatManager: ChatManager, activeProviderName: String, context: vscode.ExtensionContext, lastActiveEditor: vscode.TextEditor | undefined, webviewView: vscode.WebviewView, msg: any) {
 
     // ── Switch provider ───────────────────────────────────────────
     if (msg.type === "switchProvider") {
@@ -61,19 +61,18 @@ export async function handleMessage(activeProvider: AIProvider | null, activePro
             return;
         }
 
-        const client = activeProvider;
-
         try {
             const fileContext = getCurrentFileContext(lastActiveEditor);
             const systemPrompt = buildSystemPrompt(fileContext);
             const config = vscode.workspace.getConfiguration("goseeky-code");
             const temperature = config.get<number>("temperature", 0.2);
 
-            const reply = await client.chat(
-                [
+            const reply = await chatManager.chat(
+                activeProvider,
+                
                     { role: "system", content: systemPrompt },
                     { role: "user", content: msg.text }
-                ],
+                ,
                 { temperature }
             );
 
