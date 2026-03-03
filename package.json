@@ -98,5 +98,8 @@
     "@types/node": "^20.19.35",
     "@types/vscode": "^1.90.0",
     "typescript": "^5.4.0"
+  },
+  "dependencies": {
+    "lowdb": "^7.0.1"
   }
 }

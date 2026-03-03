@@ -1,18 +1,25 @@
+import * as vscode from "vscode";
 import { AIProvider, ChatMessage, ChatOptions } from "./types";
 
 const MAX_MESSAGES = 20;
 const MAX_TOKENS = 30000;
 
-// Rough token estimator: ~4 chars per token
 function estimateTokens(text: string): number {
   return Math.ceil(text.length / 4);
 }
 
 export class ChatManager {
   private history: ChatMessage[] = [];
+  private readonly storageKey = "goseeky.chatHistory";
+
+  constructor(private context: vscode.ExtensionContext) {
+    // Load persisted history on startup
+    this.history = this.context.globalState.get<ChatMessage[]>(this.storageKey, []);
+  }
 
   clear() {
     this.history = [];
+    this.context.globalState.update(this.storageKey, []);
   }
 
   getHistory(systemMsg: ChatMessage, userMsg: ChatMessage): ChatMessage[] {
@@ -31,7 +38,6 @@ export class ChatManager {
       remainingTokens -= tokens;
     }
 
-    // Ensure history starts with a user message
     while (trimmed.length > 0 && trimmed[0].role !== "user") {
       trimmed.shift();
     }
@@ -52,9 +58,11 @@ export class ChatManager {
     const messages = this.getHistory(systemMsg, userMsg);
     const reply = await client.chat(messages, options);
 
-    // Only store user/assistant pairs, not system
     this.history.push(userMsg);
     this.history.push({ role: "assistant", content: reply });
+
+    // Persist to globalState
+    await this.context.globalState.update(this.storageKey, this.history);
 
     return reply;
   }

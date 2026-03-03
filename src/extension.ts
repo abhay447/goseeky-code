@@ -7,7 +7,7 @@ import { handleMessage } from "./webview/webviewHandler";
 let activeProvider: AIProvider | null = null;
 let activeProviderName: "sarvam" | "gemini" = "sarvam";
 let lastActiveEditor: vscode.TextEditor | undefined;
-let chatManager: ChatManager = new ChatManager();
+let chatManager: ChatManager;
 
 export async function activate(context: vscode.ExtensionContext) {
   console.log("Goseeky Code extension activated");
@@ -15,6 +15,7 @@ export async function activate(context: vscode.ExtensionContext) {
   // Load saved keys on startup — use whichever is available
   const sarvamKey = await context.secrets.get("goseeky.sarvam.apiKey");
   const geminiKey = await context.secrets.get("goseeky.gemini.apiKey");
+  chatManager = new ChatManager(context);
 
   if (sarvamKey) {
     activeProvider = new SarvamProvider(sarvamKey);
