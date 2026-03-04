@@ -212,11 +212,11 @@
 <body>
 
     <div id="toolbar">
-        <button id="btn-read">📄 File</button>
+        <!-- <button id="btn-read">📄 File</button>
         <button id="btn-open">📂 Open</button>
         <button id="btn-list">🗂 List</button>
         <button id="btn-selection">✂️ Select</button>
-        <button id="btn-clear">🗑 Clear</button>
+        <button id="btn-clear">🗑 Clear</button> -->
         <button id="btn-switch">🔄 <span id="provider-name">sarvam</span></button>
     </div>
 
@@ -237,22 +237,22 @@
         const providerNameEl = document.getElementById('provider-name');
 
         // ── Toolbar ───────────────────────────────────────────────────────
-        document.getElementById('btn-read').addEventListener('click', () => {
-            vscode.postMessage({ type: 'readFile' });
-        });
-        document.getElementById('btn-open').addEventListener('click', () => {
-            vscode.postMessage({ type: 'openFile' });
-        });
-        document.getElementById('btn-list').addEventListener('click', () => {
-            vscode.postMessage({ type: 'listFiles' });
-        });
-        document.getElementById('btn-selection').addEventListener('click', () => {
-            addMessage('(Using selected text as context)', 'system');
-            vscode.postMessage({ type: 'readFile' });
-        });
-        document.getElementById('btn-clear').addEventListener('click', () => {
-            vscode.postMessage({ type: 'clearHistory' });
-        });
+        // document.getElementById('btn-read').addEventListener('click', () => {
+        //     vscode.postMessage({ type: 'readFile' });
+        // });
+        // document.getElementById('btn-open').addEventListener('click', () => {
+        //     vscode.postMessage({ type: 'openFile' });
+        // });
+        // document.getElementById('btn-list').addEventListener('click', () => {
+        //     vscode.postMessage({ type: 'listFiles' });
+        // });
+        // document.getElementById('btn-selection').addEventListener('click', () => {
+        //     addMessage('(Using selected text as context)', 'system');
+        //     vscode.postMessage({ type: 'readFile' });
+        // });
+        // document.getElementById('btn-clear').addEventListener('click', () => {
+        //     vscode.postMessage({ type: 'clearHistory' });
+        // });
         document.getElementById('btn-switch').addEventListener('click', () => {
             vscode.postMessage({ type: 'switchProvider' });
         });

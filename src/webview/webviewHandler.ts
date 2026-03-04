@@ -85,8 +85,7 @@ export async function handleAgentMessage(
         }
         const client = state.activeProvider;
         try {
-            const fileContext = getCurrentFileContext(lastActiveEditor);
-            const systemPrompt = buildSystemPrompt(fileContext);
+            const systemPrompt = buildSystemPrompt();
             const config = vscode.workspace.getConfiguration("goseeky-code");
             const temperature = config.get<number>("temperature", 0.2);
 
@@ -231,17 +230,10 @@ function getCurrentFileContext(lastActiveEditor: vscode.TextEditor | undefined) 
     };
 }
 
-function buildSystemPrompt(fileContext: ReturnType<typeof getCurrentFileContext>): string {
-    let fileSection = "No file is currently open.";
-    if (fileContext) {
-        const numbered = fileContext.content.split("\n").map((line, i) => `${String(i + 1).padStart(4, " ")} | ${line}`).join("\n");
-        fileSection = `The user currently has this file open: ${fileContext.path} (${fileContext.language})\n\n\`\`\`${fileContext.language}\n${numbered}\n\`\`\`${fileContext.selection ? `\n\nSelected text:\n\`\`\`\n${fileContext.selection}\n\`\`\`` : ""}`;
-    }
+function buildSystemPrompt(): string {
 
     return `You are Goseeky, a precise AI coding assistant integrated into VS Code.
 You can respond in English or any Indian language the user writes in.
-
-${fileSection}
 
 IMPORTANT: USE SHELL COMMANDS FOR ALL FILE OPERATIONS.
 Wrap EVERY shell command with BOTH opening AND closing tags. The closing tag </run-shell> is MANDATORY.
