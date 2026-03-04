@@ -16,6 +16,7 @@
             gap: 4px;
             margin-bottom: 8px;
             flex-wrap: wrap;
+            align-items: center;
         }
 
         #toolbar button {
@@ -29,6 +30,12 @@
             color: var(--vscode-badge-foreground);
         }
 
+        #btn-clear {
+            background: transparent;
+            color: var(--vscode-descriptionForeground);
+            border: 1px solid var(--vscode-input-border);
+        }
+
         #file-info {
             font-size: 11px;
             color: var(--vscode-descriptionForeground);
@@ -37,10 +44,13 @@
             background: var(--vscode-editor-inactiveSelectionBackground);
             border-radius: 3px;
             display: none;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         #messages {
-            height: calc(100vh - 190px);
+            height: calc(100vh - 200px);
             overflow-y: auto;
             margin-bottom: 8px;
         }
@@ -60,10 +70,14 @@
 
         .assistant {
             background: var(--vscode-editor-inactiveSelectionBackground);
+            white-space: normal;
         }
 
         .error {
             color: var(--vscode-errorForeground);
+            background: var(--vscode-inputValidation-errorBackground);
+            padding: 6px 8px;
+            border-radius: 4px;
         }
 
         .system {
@@ -71,6 +85,50 @@
             font-style: italic;
             font-size: 11px;
             text-align: center;
+        }
+
+        .action-card {
+            margin: 8px 0;
+            padding: 8px;
+            border-radius: 4px;
+            border-left: 3px solid var(--vscode-activityBarBadge-background);
+            background: var(--vscode-editor-inactiveSelectionBackground);
+        }
+
+        .action-card .card-title {
+            font-size: 11px;
+            font-weight: bold;
+            margin-bottom: 6px;
+            color: var(--vscode-activityBarBadge-background);
+        }
+
+        .action-card pre {
+            margin: 6px 0;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .card-buttons {
+            display: flex;
+            gap: 6px;
+            margin-top: 6px;
+            flex-wrap: wrap;
+        }
+
+        .shell-card {
+            border-left-color: var(--vscode-terminal-ansiGreen);
+        }
+
+        .shell-card .card-title {
+            color: var(--vscode-terminal-ansiGreen);
+        }
+
+        .shell-result {
+            border-left-color: var(--vscode-terminal-ansiBrightBlack);
+        }
+
+        .shell-result .card-title {
+            color: var(--vscode-terminal-ansiBrightBlack);
         }
 
         #input-row {
@@ -96,16 +154,32 @@
             padding: 6px 12px;
             border-radius: 4px;
             cursor: pointer;
+            font-size: 12px;
         }
 
         button:hover {
             background: var(--vscode-button-hoverBackground);
         }
 
-        .apply-btn {
-            font-size: 11px;
-            margin-top: 4px;
-            padding: 3px 8px;
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-apply {
+            background: var(--vscode-terminal-ansiGreen);
+            color: #000;
+        }
+
+        .btn-discard {
+            background: transparent;
+            color: var(--vscode-errorForeground);
+            border: 1px solid var(--vscode-errorForeground);
+        }
+
+        .btn-run {
+            background: var(--vscode-terminal-ansiGreen);
+            color: #000;
         }
 
         pre {
@@ -113,12 +187,24 @@
             padding: 8px;
             border-radius: 4px;
             overflow-x: auto;
-            position: relative;
+            font-family: var(--vscode-editor-font-family);
+            font-size: 12px;
         }
 
         code {
             font-family: var(--vscode-editor-font-family);
             font-size: 12px;
+            background: var(--vscode-editor-background);
+            padding: 1px 4px;
+            border-radius: 3px;
+        }
+
+        .confidence-high {
+            color: var(--vscode-terminal-ansiGreen);
+        }
+
+        .confidence-low {
+            color: var(--vscode-terminal-ansiYellow);
         }
     </style>
 </head>
@@ -126,10 +212,11 @@
 <body>
 
     <div id="toolbar">
-        <button id="btn-read">📄 Read File</button>
-        <button id="btn-open">📂 Open File</button>
-        <button id="btn-list">🗂 List Files</button>
-        <button id="btn-selection">✂️ Selection</button>
+        <button id="btn-read">📄 File</button>
+        <button id="btn-open">📂 Open</button>
+        <button id="btn-list">🗂 List</button>
+        <button id="btn-selection">✂️ Select</button>
+        <button id="btn-clear">🗑 Clear</button>
         <button id="btn-switch">🔄 <span id="provider-name">sarvam</span></button>
     </div>
 
@@ -149,7 +236,7 @@
         const fileInfoEl = document.getElementById('file-info');
         const providerNameEl = document.getElementById('provider-name');
 
-        // ── Toolbar buttons ───────────────────────────────────────────────
+        // ── Toolbar ───────────────────────────────────────────────────────
         document.getElementById('btn-read').addEventListener('click', () => {
             vscode.postMessage({ type: 'readFile' });
         });
@@ -160,8 +247,11 @@
             vscode.postMessage({ type: 'listFiles' });
         });
         document.getElementById('btn-selection').addEventListener('click', () => {
-            addMessage('(Using selected text as context for next question)', 'system');
+            addMessage('(Using selected text as context)', 'system');
             vscode.postMessage({ type: 'readFile' });
+        });
+        document.getElementById('btn-clear').addEventListener('click', () => {
+            vscode.postMessage({ type: 'clearHistory' });
         });
         document.getElementById('btn-switch').addEventListener('click', () => {
             vscode.postMessage({ type: 'switchProvider' });
@@ -175,7 +265,7 @@
             }
         });
 
-        // ── Send message ──────────────────────────────────────────────────
+        // ── Send ──────────────────────────────────────────────────────────
         function send() {
             const text = inputEl.value.trim();
             if (!text) return;
@@ -184,164 +274,253 @@
             vscode.postMessage({ type: 'ask', text });
         }
 
-        // ── Add message to chat ───────────────────────────────────────────
+        // ── Plain message ─────────────────────────────────────────────────
         function addMessage(text, cls) {
             const div = document.createElement('div');
             div.className = 'msg ' + cls;
-
             if (cls === 'assistant') {
                 div.innerHTML = renderMarkdown(text);
-                div.querySelectorAll('pre').forEach(pre => {
-                    const codeEl = pre.querySelector('code');
-                    const code = codeEl ? codeEl.textContent : null;
-                    if (code) {
-                        const confirmDiv = document.createElement('div');
-                        confirmDiv.style.cssText = 'display:none; margin-top:6px; gap:6px; align-items:center;';
-                        confirmDiv.innerHTML = '<span style="font-size:11px;">Replace entire file with this code?</span>';
-
-                        const yesBtn = document.createElement('button');
-                        yesBtn.className = 'apply-btn';
-                        yesBtn.textContent = '✅ Yes, Apply';
-                        yesBtn.addEventListener('click', () => {
-                            vscode.postMessage({ type: 'applyEdit', code });
-                            confirmDiv.style.display = 'none';
-                        });
-
-                        const noBtn = document.createElement('button');
-                        noBtn.className = 'apply-btn';
-                        noBtn.textContent = '❌ Cancel';
-                        noBtn.style.marginLeft = '4px';
-                        noBtn.addEventListener('click', () => {
-                            confirmDiv.style.display = 'none';
-                        });
-
-                        confirmDiv.appendChild(yesBtn);
-                        confirmDiv.appendChild(noBtn);
-
-                        const applyBtn = document.createElement('button');
-                        applyBtn.className = 'apply-btn';
-                        applyBtn.textContent = '⚡ Apply to File';
-                        applyBtn.addEventListener('click', () => {
-                            confirmDiv.style.display = confirmDiv.style.display === 'none' ? 'flex' : 'none';
-                        });
-
-                        pre.appendChild(applyBtn);
-                        pre.appendChild(confirmDiv);
-                    }
-                });
             } else {
                 div.textContent = text;
             }
-
             messagesEl.appendChild(div);
             messagesEl.scrollTop = messagesEl.scrollHeight;
         }
 
-        // ── Handle reply with confidence/createFile ───────────────────────
-        function applyReply(msg) {
+        // ── Edit card (no auto apply) ─────────────────────────────────────
+        function addEditCard(text, code, confidence) {
+            if (text) addMessage(text, 'assistant');
 
-            // Auto-applied HIGH confidence
-            if (msg.autoApplied) {
-                if (msg.text) addMessage(msg.text, 'assistant');
-                addMessage('⚡ High confidence — applied automatically!', 'system');
-                return;
+            const capturedCode = code;
+            const card = document.createElement('div');
+            card.className = 'action-card';
+
+            const title = document.createElement('div');
+            title.className = 'card-title';
+            const confClass = confidence === 'HIGH' ? 'confidence-high' : 'confidence-low';
+            const confIcon = confidence === 'HIGH' ? '⚡' : '⚠️';
+            title.innerHTML = `${confIcon} Edit suggestion — <span class="${confClass}">${confidence} confidence</span>`;
+            card.appendChild(title);
+
+            const pre = document.createElement('pre');
+            pre.textContent = capturedCode;
+            card.appendChild(pre);
+
+            const btns = document.createElement('div');
+            btns.className = 'card-buttons';
+
+            const applyBtn = document.createElement('button');
+            applyBtn.className = 'btn-apply';
+            applyBtn.textContent = '✅ Apply';
+            applyBtn.addEventListener('click', () => {
+                vscode.postMessage({ type: 'applyEdit', code: capturedCode });
+                applyBtn.disabled = true;
+                applyBtn.textContent = 'Applying...';
+            });
+
+            const discardBtn = document.createElement('button');
+            discardBtn.className = 'btn-discard';
+            discardBtn.textContent = '❌ Discard';
+            discardBtn.addEventListener('click', () => card.remove());
+
+            btns.appendChild(applyBtn);
+            btns.appendChild(discardBtn);
+            card.appendChild(btns);
+
+            messagesEl.appendChild(card);
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+        }
+
+        // ── Create file card ──────────────────────────────────────────────
+        function addCreateFileCard(text, filename, code) {
+            if (text) addMessage(text, 'assistant');
+
+            const capturedFilename = filename;
+            const capturedCode = code;
+
+            const card = document.createElement('div');
+            card.className = 'action-card';
+
+            const title = document.createElement('div');
+            title.className = 'card-title';
+            title.textContent = `📄 Create file: ${capturedFilename}`;
+            card.appendChild(title);
+
+            const pre = document.createElement('pre');
+            pre.textContent = capturedCode;
+            card.appendChild(pre);
+
+            const btns = document.createElement('div');
+            btns.className = 'card-buttons';
+
+            const createBtn = document.createElement('button');
+            createBtn.className = 'btn-apply';
+            createBtn.textContent = `💾 Create ${capturedFilename}`;
+            createBtn.addEventListener('click', () => {
+                vscode.postMessage({ type: 'createFile', filename: capturedFilename, code: capturedCode });
+                createBtn.disabled = true;
+                createBtn.textContent = '✅ Creating...';
+            });
+
+            const discardBtn = document.createElement('button');
+            discardBtn.className = 'btn-discard';
+            discardBtn.textContent = '❌ Discard';
+            discardBtn.addEventListener('click', () => card.remove());
+
+            btns.appendChild(createBtn);
+            btns.appendChild(discardBtn);
+            card.appendChild(btns);
+
+            messagesEl.appendChild(card);
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+        }
+
+        // ── Shell command card ────────────────────────────────────────────
+        function addShellCard(text, command) {
+            if (text) addMessage(text, 'assistant');
+
+            const capturedCommand = command;
+
+            const card = document.createElement('div');
+            card.className = 'action-card shell-card';
+
+            const title = document.createElement('div');
+            title.className = 'card-title';
+            title.textContent = '$ Shell command';
+            card.appendChild(title);
+
+            const pre = document.createElement('pre');
+            pre.textContent = capturedCommand;
+            card.appendChild(pre);
+
+            const btns = document.createElement('div');
+            btns.className = 'card-buttons';
+
+            const runBtn = document.createElement('button');
+            runBtn.className = 'btn-run';
+            runBtn.textContent = '▶ Run';
+            runBtn.addEventListener('click', () => {
+                vscode.postMessage({ type: 'runShell', command: capturedCommand });
+                runBtn.disabled = true;
+                runBtn.textContent = 'Running...';
+            });
+
+            const discardBtn = document.createElement('button');
+            discardBtn.className = 'btn-discard';
+            discardBtn.textContent = '❌ Skip';
+            discardBtn.addEventListener('click', () => card.remove());
+
+            btns.appendChild(runBtn);
+            btns.appendChild(discardBtn);
+            card.appendChild(btns);
+
+            messagesEl.appendChild(card);
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+        }
+
+        // ── Shell result card ─────────────────────────────────────────────
+        function addShellResultCard(command, stdout, stderr) {
+            const card = document.createElement('div');
+            card.className = 'action-card shell-result';
+
+            const title = document.createElement('div');
+            title.className = 'card-title';
+            title.textContent = `$ ${command}`;
+            card.appendChild(title);
+
+            if (stdout) {
+                const pre = document.createElement('pre');
+                pre.textContent = stdout;
+                card.appendChild(pre);
             }
 
-            // Edit with confidence tag
-            if (msg.code && msg.confidence) {
-                if (msg.text) addMessage(msg.text, 'assistant');
-
-                const capturedCode = msg.code;
-
-                const div = document.createElement('div');
-                div.className = 'msg system';
-                div.textContent = msg.confidence === 'HIGH'
-                    ? '⚡ High confidence edit ready'
-                    : '⚠️ Low confidence — please review before applying';
-
-                const applyBtn = document.createElement('button');
-                applyBtn.className = 'apply-btn';
-                applyBtn.textContent = '✅ Apply';
-                applyBtn.addEventListener('click', () => {
-                    vscode.postMessage({ type: 'applyEdit', code: capturedCode });
-                    applyBtn.disabled = true;
-                    applyBtn.textContent = 'Applied!';
-                });
-
-                const discardBtn = document.createElement('button');
-                discardBtn.className = 'apply-btn';
-                discardBtn.style.marginLeft = '4px';
-                discardBtn.textContent = '❌ Discard';
-                discardBtn.addEventListener('click', () => {
-                    div.remove();
-                });
-
-                div.appendChild(document.createElement('br'));
-                div.appendChild(applyBtn);
-                div.appendChild(discardBtn);
-                messagesEl.appendChild(div);
-                messagesEl.scrollTop = messagesEl.scrollHeight;
-                return;
+            if (stderr) {
+                const err = document.createElement('pre');
+                err.style.color = 'var(--vscode-errorForeground)';
+                err.textContent = '⚠️ ' + stderr;
+                card.appendChild(err);
             }
 
-            // Create new file
-            if (msg.createFile) {
-                if (msg.text) addMessage(msg.text, 'assistant');
-
-                const capturedFilename = msg.createFile.filename;
-                const capturedCode = msg.createFile.code;
-
-                const div = document.createElement('div');
-                div.className = 'msg system';
-                div.textContent = '📄 Goseeky wants to create: ' + capturedFilename;
-
-                const createBtn = document.createElement('button');
-                createBtn.className = 'apply-btn';
-                createBtn.textContent = '💾 Create ' + capturedFilename;
-                createBtn.addEventListener('click', () => {
-                    vscode.postMessage({ type: 'createFile', filename: capturedFilename, code: capturedCode });
-                    createBtn.disabled = true;
-                    createBtn.textContent = '✅ Creating...';
-                });
-
-                div.appendChild(document.createElement('br'));
-                div.appendChild(createBtn);
-                messagesEl.appendChild(div);
-                messagesEl.scrollTop = messagesEl.scrollHeight;
-                return;
-            }
-
-            // Plain reply
-            addMessage(msg.text, 'assistant');
+            messagesEl.appendChild(card);
+            messagesEl.scrollTop = messagesEl.scrollHeight;
         }
 
         // ── Markdown renderer ─────────────────────────────────────────────
         function renderMarkdown(text) {
             return text
-                .replace(/```(\w+)?\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
+                .replace(/```(\w+)?\n([\s\S]*?)```/g, '<pre>$2</pre>')
                 .replace(/`([^`]+)`/g, '<code>$1</code>')
                 .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
                 .replace(/\n/g, '<br>');
         }
 
-        function showFileInfo(path) {
+        function showFileInfo(filePath) {
             fileInfoEl.style.display = 'block';
-            fileInfoEl.textContent = '📄 Context: ' + path;
+            fileInfoEl.textContent = '📄 ' + filePath;
+        }
+
+        function addShellRunningCard(command) {
+            const card = document.createElement('div');
+            card.className = 'action-card shell-card';
+            card.id = 'running-' + btoa(command).slice(0, 10);
+
+            const title = document.createElement('div');
+            title.className = 'card-title';
+            title.textContent = '⏳ Running...';
+            card.appendChild(title);
+
+            const pre = document.createElement('pre');
+            pre.textContent = command;
+            card.appendChild(pre);
+
+            messagesEl.appendChild(card);
+            messagesEl.scrollTop = messagesEl.scrollHeight;
         }
 
         // ── Message handler ───────────────────────────────────────────────
         window.addEventListener('message', (e) => {
             const msg = e.data;
 
-            if (msg.type === 'reply') applyReply(msg);
-            if (msg.type === 'error') addMessage('❌ Error: ' + msg.text, 'error');
-            if (msg.type === 'editApplied') addMessage('✅ Done! File saved and opened.', 'system');
+            if (msg.type === 'reply') {
+                if (msg.code && msg.confidence) {
+                    addEditCard(msg.text, msg.code, msg.confidence);
+                    return;
+                }
+                if (msg.createFile) {
+                    addCreateFileCard(msg.text, msg.createFile.filename, msg.createFile.code);
+                    return;
+                }
+                // ↓ removed shellCommands check — commands now auto-run server side
+                addMessage(msg.text, 'assistant');
+            }
+
+            if (msg.type === 'shellRunning') {
+                addShellRunningCard(msg.command);
+            }
+
+            if (msg.type === 'shellResult') {
+                const runningId = 'running-' + btoa(msg.command).slice(0, 10);
+                const runningCard = document.getElementById(runningId);
+                if (runningCard) runningCard.remove();
+                addShellResultCard(msg.command, msg.stdout, msg.stderr);
+            }
+
+            if (msg.type === 'error') {
+                addMessage('❌ ' + msg.text, 'error');
+            }
+            if (msg.type === 'editApplied') {
+                addMessage('✅ Done! File saved.', 'system');
+            }
             if (msg.type === 'fileContent') {
                 showFileInfo(msg.path);
                 addMessage('📄 Loaded: ' + msg.path, 'system');
             }
             if (msg.type === 'fileList') {
-                addMessage('📁 Workspace files:\n' + msg.files.join('\n'), 'assistant');
+                addMessage('📁 Files:\n' + msg.files.join('\n'), 'assistant');
+            }
+            if (msg.type === 'historyCleared') {
+                messagesEl.innerHTML = '';
+                addMessage('🗑 History cleared', 'system');
             }
             if (msg.type === 'providerChanged') {
                 providerNameEl.textContent = msg.provider;

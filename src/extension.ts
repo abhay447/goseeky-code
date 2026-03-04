@@ -2,12 +2,14 @@ import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
 import { AIProvider, SarvamProvider, GeminiProvider, ChatManager } from "./providers";
-import { handleMessage } from "./webview/webviewHandler";
+import { AgentState, handleAgentMessage } from "./webview/webviewHandler";
 
-let activeProvider: AIProvider | null = null;
-let activeProviderName: "sarvam" | "gemini" = "sarvam";
 let lastActiveEditor: vscode.TextEditor | undefined;
 let chatManager: ChatManager;
+const state: AgentState = {
+  activeProvider: null,
+  activeProviderName: "sarvam"
+};
 
 export async function activate(context: vscode.ExtensionContext) {
   console.log("Goseeky Code extension activated");
@@ -18,11 +20,11 @@ export async function activate(context: vscode.ExtensionContext) {
   chatManager = new ChatManager(context);
 
   if (sarvamKey) {
-    activeProvider = new SarvamProvider(sarvamKey);
-    activeProviderName = "sarvam";
+    state.activeProvider = new SarvamProvider(sarvamKey);
+    state.activeProviderName = "sarvam";
   } else if (geminiKey) {
-    activeProvider = new GeminiProvider(geminiKey);
-    activeProviderName = "gemini";
+    state.activeProvider = new GeminiProvider(geminiKey);
+    state.activeProviderName = "gemini";
   }
 
   // Track last active editor (webview steals focus)
@@ -38,7 +40,14 @@ export async function activate(context: vscode.ExtensionContext) {
       resolveWebviewView(webviewView) {
         webviewView.webview.options = { enableScripts: true };
         webviewView.webview.html = getChatHtml(context, webviewView.webview);
-        webviewView.webview.onDidReceiveMessage(async (msg) => handleMessage(activeProvider, chatManager, activeProviderName, context, lastActiveEditor, webviewView, msg));
+        webviewView.webview.onDidReceiveMessage(async (msg) => await handleAgentMessage(
+          state,
+          chatManager,
+          context,
+          lastActiveEditor,
+          webviewView,
+          msg
+        ));
       }
     })
   );
@@ -65,10 +74,10 @@ export async function activate(context: vscode.ExtensionContext) {
 
       if (key) {
         await context.secrets.store(`goseeky.${provider.id}.apiKey`, key);
-        activeProviderName = provider.id as "sarvam" | "gemini";
-        activeProvider = provider.id === "sarvam"
-          ? new SarvamProvider(key)
-          : new GeminiProvider(key);
+state.activeProviderName = provider.id as "sarvam" | "gemini";
+state.activeProvider = provider.id === "sarvam"
+  ? new SarvamProvider(key)
+  : new GeminiProvider(key);
         vscode.window.showInformationMessage(`✅ ${provider.id} API key saved and activated!`);
       }
     })
@@ -81,13 +90,13 @@ export async function activate(context: vscode.ExtensionContext) {
         [
           {
             label: "$(sparkle) Sarvam AI",
-            description: activeProviderName === "sarvam" ? "● active" : "",
+            description: state.activeProviderName === "sarvam" ? "● active" : "",
             detail: "sarvam-m — best for Indic languages",
             id: "sarvam"
           },
           {
             label: "$(globe) Gemini",
-            description: activeProviderName === "gemini" ? "● active" : "",
+            description: state.activeProviderName === "gemini" ? "● active" : "",
             detail: "gemini-2.5-flash — Google's model",
             id: "gemini"
           },
@@ -109,10 +118,10 @@ export async function activate(context: vscode.ExtensionContext) {
         return;
       }
 
-      activeProviderName = pick.id as "sarvam" | "gemini";
-      activeProvider = pick.id === "sarvam"
-        ? new SarvamProvider(key)
-        : new GeminiProvider(key);
+state.activeProviderName = pick.id as "sarvam" | "gemini";
+state.activeProvider = pick.id === "sarvam"
+  ? new SarvamProvider(key)
+  : new GeminiProvider(key);
 
       vscode.window.showInformationMessage(`✅ Switched to ${pick.id}`);
     })
@@ -121,7 +130,7 @@ export async function activate(context: vscode.ExtensionContext) {
   // ── Command: Quick Ask ────────────────────────────────────────────────────
   context.subscriptions.push(
     vscode.commands.registerCommand("goseeky-code.ask", async () => {
-      if (!activeProvider) {
+      if (!state.activeProvider) {
         vscode.window.showErrorMessage("Set your API key first!");
         await vscode.commands.executeCommand("goseeky-code.setApiKey");
         return;
@@ -134,7 +143,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
       if (!question) return;
 
-      const client = activeProvider;
+      const client = state.activeProvider;
       await vscode.window.withProgress(
         { location: vscode.ProgressLocation.Notification, title: "Goseeky AI is thinking..." },
         async () => {
@@ -155,7 +164,7 @@ export async function activate(context: vscode.ExtensionContext) {
   // ── Command: Explain Selected Code ───────────────────────────────────────
   context.subscriptions.push(
     vscode.commands.registerCommand("goseeky-code.explainCode", async () => {
-      if (!activeProvider) {
+      if (!state.activeProvider) {
         vscode.window.showErrorMessage("Set your API key first!");
         return;
       }
@@ -173,7 +182,7 @@ export async function activate(context: vscode.ExtensionContext) {
       }
 
       const lang = editor.document.languageId;
-      const client = activeProvider;
+      const client = state.activeProvider;
 
       await vscode.window.withProgress(
         { location: vscode.ProgressLocation.Notification, title: "Explaining code..." },
