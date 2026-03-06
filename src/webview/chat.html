@@ -1,46 +1,223 @@
 <!DOCTYPE html>
 <html>
+
 <head>
     <style>
-        body { font-family: var(--vscode-font-family); padding: 8px; background: var(--vscode-sideBar-background); color: var(--vscode-foreground); font-size: 13px; }
-        #toolbar { display: flex; gap: 4px; margin-bottom: 8px; flex-wrap: wrap; align-items: center; }
-        #toolbar button { font-size: 11px; padding: 3px 8px; }
-        #btn-switch { margin-left: auto; background: var(--vscode-badge-background); color: var(--vscode-badge-foreground); }
-        #btn-clear { background: transparent; color: var(--vscode-descriptionForeground); border: 1px solid var(--vscode-input-border); }
-        #messages { height: calc(100vh - 200px); overflow-y: auto; margin-bottom: 8px; }
-        .msg { margin: 8px 0; padding: 8px; border-radius: 4px; word-wrap: break-word; }
-        .user { background: var(--vscode-input-background); text-align: right; }
-        .assistant { background: var(--vscode-editor-inactiveSelectionBackground); white-space: normal; }
-        .error { color: var(--vscode-errorForeground); background: var(--vscode-inputValidation-errorBackground); padding: 6px 8px; border-radius: 4px; }
-        .system { color: var(--vscode-descriptionForeground); font-style: italic; font-size: 11px; text-align: center; }
-        .card { margin: 6px 0; padding: 8px; border-radius: 4px; background: var(--vscode-editor-inactiveSelectionBackground); border-left: 3px solid var(--vscode-activityBarBadge-background); }
-        .card-title { font-size: 11px; font-weight: bold; margin-bottom: 4px; }
-        .card.goal { border-left-color: #569cd6; }
-        .card.goal .card-title { color: #569cd6; }
-        .card.subgoal { border-left-color: #9cdcfe; }
-        .card.subgoal .card-title { color: #9cdcfe; }
-        .card.running { border-left-color: #dcdcaa; }
-        .card.running .card-title { color: #dcdcaa; }
-        .card.result { border-left-color: #4ec9b0; }
-        .card.result .card-title { color: #4ec9b0; }
-        .card.result.has-error { border-left-color: var(--vscode-errorForeground); }
-        .card.result.has-error .card-title { color: var(--vscode-errorForeground); }
-        .card.done-finished { border-left-color: #4ec9b0; }
-        .card.done-finished .card-title { color: #4ec9b0; }
-        .card.done-aborted { border-left-color: var(--vscode-errorForeground); }
-        .card.done-aborted .card-title { color: var(--vscode-errorForeground); }
-        .card.done-max { border-left-color: #dcdcaa; }
-        .card.done-max .card-title { color: #dcdcaa; }
-        .iteration-badge { display: inline-block; font-size: 10px; padding: 1px 6px; border-radius: 10px; background: var(--vscode-badge-background); color: var(--vscode-badge-foreground); margin-bottom: 4px; }
-        pre { background: var(--vscode-editor-background); padding: 6px 8px; border-radius: 3px; overflow-x: auto; font-family: var(--vscode-editor-font-family); font-size: 12px; margin: 4px 0; max-height: 200px; overflow-y: auto; }
-        code { font-family: var(--vscode-editor-font-family); font-size: 12px; background: var(--vscode-editor-background); padding: 1px 4px; border-radius: 3px; }
-        #input-row { display: flex; gap: 4px; }
-        textarea { flex: 1; background: var(--vscode-input-background); color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border); padding: 6px; border-radius: 4px; resize: none; font-family: inherit; }
-        button { background: var(--vscode-button-background); color: var(--vscode-button-foreground); border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; }
-        button:hover { background: var(--vscode-button-hoverBackground); }
-        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        body {
+            font-family: var(--vscode-font-family);
+            padding: 8px;
+            background: var(--vscode-sideBar-background);
+            color: var(--vscode-foreground);
+            font-size: 13px;
+        }
+
+        #toolbar {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 8px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        #toolbar button {
+            font-size: 11px;
+            padding: 3px 8px;
+        }
+
+        #btn-switch {
+            margin-left: auto;
+            background: var(--vscode-badge-background);
+            color: var(--vscode-badge-foreground);
+        }
+
+        #btn-clear {
+            background: transparent;
+            color: var(--vscode-descriptionForeground);
+            border: 1px solid var(--vscode-input-border);
+        }
+
+        #messages {
+            height: calc(100vh - 200px);
+            overflow-y: auto;
+            margin-bottom: 8px;
+        }
+
+        .msg {
+            margin: 8px 0;
+            padding: 8px;
+            border-radius: 4px;
+            word-wrap: break-word;
+        }
+
+        .user {
+            background: var(--vscode-input-background);
+            text-align: right;
+        }
+
+        .assistant {
+            background: var(--vscode-editor-inactiveSelectionBackground);
+            white-space: normal;
+        }
+
+        .error {
+            color: var(--vscode-errorForeground);
+            background: var(--vscode-inputValidation-errorBackground);
+            padding: 6px 8px;
+            border-radius: 4px;
+        }
+
+        .system {
+            color: var(--vscode-descriptionForeground);
+            font-style: italic;
+            font-size: 11px;
+            text-align: center;
+        }
+
+        .card {
+            margin: 6px 0;
+            padding: 8px;
+            border-radius: 4px;
+            background: var(--vscode-editor-inactiveSelectionBackground);
+            border-left: 3px solid var(--vscode-activityBarBadge-background);
+        }
+
+        .card-title {
+            font-size: 11px;
+            font-weight: bold;
+            margin-bottom: 4px;
+        }
+
+        .card.goal {
+            border-left-color: #569cd6;
+        }
+
+        .card.goal .card-title {
+            color: #569cd6;
+        }
+
+        .card.subgoal {
+            border-left-color: #9cdcfe;
+        }
+
+        .card.subgoal .card-title {
+            color: #9cdcfe;
+        }
+
+        .card.running {
+            border-left-color: #dcdcaa;
+        }
+
+        .card.running .card-title {
+            color: #dcdcaa;
+        }
+
+        .card.result {
+            border-left-color: #4ec9b0;
+        }
+
+        .card.result .card-title {
+            color: #4ec9b0;
+        }
+
+        .card.result.has-error {
+            border-left-color: var(--vscode-errorForeground);
+        }
+
+        .card.result.has-error .card-title {
+            color: var(--vscode-errorForeground);
+        }
+
+        .card.done-finished {
+            border-left-color: #4ec9b0;
+        }
+
+        .card.done-finished .card-title {
+            color: #4ec9b0;
+        }
+
+        .card.done-aborted {
+            border-left-color: var(--vscode-errorForeground);
+        }
+
+        .card.done-aborted .card-title {
+            color: var(--vscode-errorForeground);
+        }
+
+        .card.done-max {
+            border-left-color: #dcdcaa;
+        }
+
+        .card.done-max .card-title {
+            color: #dcdcaa;
+        }
+
+        .iteration-badge {
+            display: inline-block;
+            font-size: 10px;
+            padding: 1px 6px;
+            border-radius: 10px;
+            background: var(--vscode-badge-background);
+            color: var(--vscode-badge-foreground);
+            margin-bottom: 4px;
+        }
+
+        pre {
+            background: var(--vscode-editor-background);
+            padding: 6px 8px;
+            border-radius: 3px;
+            overflow-x: auto;
+            font-family: var(--vscode-editor-font-family);
+            font-size: 12px;
+            margin: 4px 0;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        code {
+            font-family: var(--vscode-editor-font-family);
+            font-size: 12px;
+            background: var(--vscode-editor-background);
+            padding: 1px 4px;
+            border-radius: 3px;
+        }
+
+        #input-row {
+            display: flex;
+            gap: 4px;
+        }
+
+        textarea {
+            flex: 1;
+            background: var(--vscode-input-background);
+            color: var(--vscode-input-foreground);
+            border: 1px solid var(--vscode-input-border);
+            padding: 6px;
+            border-radius: 4px;
+            resize: none;
+            font-family: inherit;
+        }
+
+        button {
+            background: var(--vscode-button-background);
+            color: var(--vscode-button-foreground);
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        button:hover {
+            background: var(--vscode-button-hoverBackground);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
     </style>
 </head>
+
 <body>
     <div id="toolbar">
         <button id="btn-read">📄 File</button>
@@ -51,7 +228,8 @@
     </div>
     <div id="messages"></div>
     <div id="input-row">
-        <textarea id="input" rows="3" placeholder="Describe what you want to build or fix...&#10;(Shift+Enter for newline)"></textarea>
+        <textarea id="input" rows="3"
+            placeholder="Describe what you want to build or fix...&#10;(Shift+Enter for newline)"></textarea>
         <button id="btn-send">Send</button>
     </div>
 
@@ -108,12 +286,12 @@
         function scroll() { messagesEl.scrollTop = messagesEl.scrollHeight; }
 
         function escapeHtml(text) {
-            return text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+            return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
         }
 
         function renderMarkdown(text) {
             return text
-                .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
                 .replace(/```(\w+)?\n([\s\S]*?)```/g, '<pre>$2</pre>')
                 .replace(/`([^`]+)`/g, '<code>$1</code>')
                 .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
@@ -186,45 +364,45 @@
             }
 
             if (msg.type === 'shellResult') {
-                // Replace running card if exists
-                const runningId = 'running-' + btoa(msg.command).slice(0, 12);
-                const runningCard = document.getElementById(runningId);
+                if (msg.type === 'shellResult') {
+                    const runningId = 'running-' + btoa(msg.command).slice(0, 12);
+                    const runningCard = document.getElementById(runningId);
 
-                const hasError = !!msg.stderr;
-                const card = document.createElement('div');
-                card.className = 'card result' + (hasError ? ' has-error' : '');
+                    const hasError = !!msg.stderr;
+                    const card = document.createElement('div');
+                    // neutral styling — no done/error coloring
+                    card.className = 'card result';
 
-                const icon = hasError ? '❌' : '✅';
-                const shortCmd = msg.command.length > 60 ? msg.command.slice(0, 60) + '...' : msg.command;
-                card.innerHTML = '<div class="card-title">' + icon + ' $ ' + escapeHtml(shortCmd) + '</div>';
+                    const shortCmd = msg.command.length > 60 ? msg.command.slice(0, 60) + '...' : msg.command;
+                    card.innerHTML = '<div class="card-title">$ ' + escapeHtml(shortCmd) + '</div>';
 
-                if (msg.stdout && msg.stdout !== '(no output)') {
-                    const pre = document.createElement('pre');
-                    pre.textContent = msg.stdout;
-                    card.appendChild(pre);
+                    if (msg.stdout && msg.stdout !== '(no output)') {
+                        const pre = document.createElement('pre');
+                        pre.textContent = msg.stdout;
+                        card.appendChild(pre);
+                    }
+                    if (msg.stderr) {
+                        const pre = document.createElement('pre');
+                        pre.style.color = 'var(--vscode-errorForeground)';
+                        pre.textContent = '⚠️ stderr: ' + msg.stderr;
+                        card.appendChild(pre);
+                    }
+
+                    if (runningCard) { runningCard.replaceWith(card); }
+                    else {
+                        if (currentIterationEl) { currentIterationEl.appendChild(card); }
+                        else { messagesEl.appendChild(card); }
+                    }
+                    scroll();
                 }
-                if (msg.stderr) {
-                    const pre = document.createElement('pre');
-                    pre.style.color = 'var(--vscode-errorForeground)';
-                    pre.textContent = msg.stderr;
-                    card.appendChild(pre);
-                }
-
-                if (runningCard) {
-                    runningCard.replaceWith(card);
-                } else {
-                    if (currentIterationEl) { currentIterationEl.appendChild(card); }
-                    else { messagesEl.appendChild(card); }
-                }
-                scroll();
             }
 
             if (msg.type === 'agentDone') {
                 const statusMap = {
-                    'FINISHED':       { cls: 'done-finished', icon: '✅', label: 'Done' },
-                    'ABORTED':        { cls: 'done-aborted',  icon: '🛑', label: 'Aborted' },
-                    'TERMINATED':     { cls: 'done-aborted',  icon: '🛑', label: 'Terminated' },
-                    'MAX_ITERATIONS': { cls: 'done-max',      icon: '⚠️', label: 'Max iterations reached' },
+                    'FINISHED': { cls: 'done-finished', icon: '✅', label: 'Done' },
+                    'ABORTED': { cls: 'done-aborted', icon: '🛑', label: 'Aborted' },
+                    'TERMINATED': { cls: 'done-aborted', icon: '🛑', label: 'Terminated' },
+                    'MAX_ITERATIONS': { cls: 'done-max', icon: '⚠️', label: 'Max iterations reached' },
                 };
                 const s = statusMap[msg.status] ?? { cls: 'done-finished', icon: '✅', label: msg.status };
                 const card = document.createElement('div');
@@ -274,4 +452,5 @@
         });
     </script>
 </body>
+
 </html>
