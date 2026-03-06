@@ -1,4 +1,6 @@
 import * as vscode from "vscode";
+import * as os from 'os';
+import * as process from 'process';
 
 // ── Get current file context ──────────────────────────────────────────────────
 export function getCurrentFileContext(lastActiveEditor: vscode.TextEditor | undefined) {
@@ -12,6 +14,28 @@ export function getCurrentFileContext(lastActiveEditor: vscode.TextEditor | unde
     };
 }
 
+function getExtensionContextInfo() {
+    // 1. Get Current Folder (Primary Workspace Root)
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    const currentFolder = workspaceFolders ? workspaceFolders[0].uri.fsPath : 'No workspace open';
+
+    // 2. Operating System Info
+    const operatingSystem = `${os.type()} (${os.platform()}) ${os.release()}`;
+
+    // 3. Shell (Fallback logic for Windows vs Unix)
+    const shell = process.env.SHELL || process.env.ComSpec || 'Unknown Shell';
+
+    // 4. DateTime
+    const dateTime = new Date().toLocaleString();
+
+    return {
+        "current_working_directory" : currentFolder,
+        "operating_system": operatingSystem,
+        "shell" : shell,
+        "date_time": dateTime
+    };
+}
+
 // ── Build system prompt with line-numbered file context ───────────────────────
 export function buildSystemPrompt(): string {
 
@@ -19,6 +43,9 @@ export function buildSystemPrompt(): string {
         Description:
             - You are Goseeky, a precise AI coding assistant.
             - You can respond in English or any Indian language the user writes in (Hindi, Kannada, Tamil, Telugu, Bengali, etc.).
+        
+        Details about execution environment:
+            ${getExtensionContextInfo()}
 
         Orchestration:
             - Accept user input.
@@ -49,38 +76,6 @@ export function buildSystemPrompt(): string {
                 <status> INPROGRESS/FINISHED/ABORTED/TERMINATED. </status>
 
             </response>
-
-
-            Example of run shell:
-                creating a file:
-                    <run-shell>
-                    cat > path/to/file.ts << 'GOSEEKY_EOF'
-                    content here
-                    GOSEEKY_EOF
-                    </run-shell>
-
-                simple command:
-                    <run-shell>ls -la</run-shell>
-
-                replacing full file:
-                    <run-shell>
-                    cat > path/to/file.ts << 'GOSEEKY_EOF'
-                    full new content
-                    GOSEEKY_EOF
-                    </run-shell>
-
-                targeted line edit (use exact line numbers from file above):
-                    <run-shell>sed -i '' '10,15d' path/to/file.ts</run-shell>
-
-                insert after line N:
-                    <run-shell>
-                    sed -i '' 'Na\\
-                    new content
-                    ' path/to/file.ts
-                    </run-shell>
-
-                install package:
-                    <run-shell>npm install express</run-shell>
 
         RULES:
         - EVERY <run-shell> MUST have a </run-shell> closing tag. No exceptions.
