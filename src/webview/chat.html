@@ -1,231 +1,57 @@
 <!DOCTYPE html>
 <html>
-
 <head>
     <style>
-        body {
-            font-family: var(--vscode-font-family);
-            padding: 8px;
-            background: var(--vscode-sideBar-background);
-            color: var(--vscode-foreground);
-            font-size: 13px;
-        }
-
-        #toolbar {
-            display: flex;
-            gap: 4px;
-            margin-bottom: 8px;
-            flex-wrap: wrap;
-            align-items: center;
-        }
-
-        #toolbar button {
-            font-size: 11px;
-            padding: 3px 8px;
-        }
-
-        #btn-switch {
-            margin-left: auto;
-            background: var(--vscode-badge-background);
-            color: var(--vscode-badge-foreground);
-        }
-
-        #btn-clear {
-            background: transparent;
-            color: var(--vscode-descriptionForeground);
-            border: 1px solid var(--vscode-input-border);
-        }
-
-        #file-info {
-            font-size: 11px;
-            color: var(--vscode-descriptionForeground);
-            margin-bottom: 6px;
-            padding: 4px;
-            background: var(--vscode-editor-inactiveSelectionBackground);
-            border-radius: 3px;
-            display: none;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        #messages {
-            height: calc(100vh - 200px);
-            overflow-y: auto;
-            margin-bottom: 8px;
-        }
-
-        .msg {
-            margin: 8px 0;
-            padding: 8px;
-            border-radius: 4px;
-            white-space: pre-wrap;
-            word-wrap: break-word;
-        }
-
-        .user {
-            background: var(--vscode-input-background);
-            text-align: right;
-        }
-
-        .assistant {
-            background: var(--vscode-editor-inactiveSelectionBackground);
-            white-space: normal;
-        }
-
-        .error {
-            color: var(--vscode-errorForeground);
-            background: var(--vscode-inputValidation-errorBackground);
-            padding: 6px 8px;
-            border-radius: 4px;
-        }
-
-        .system {
-            color: var(--vscode-descriptionForeground);
-            font-style: italic;
-            font-size: 11px;
-            text-align: center;
-        }
-
-        .action-card {
-            margin: 8px 0;
-            padding: 8px;
-            border-radius: 4px;
-            border-left: 3px solid var(--vscode-activityBarBadge-background);
-            background: var(--vscode-editor-inactiveSelectionBackground);
-        }
-
-        .action-card .card-title {
-            font-size: 11px;
-            font-weight: bold;
-            margin-bottom: 6px;
-            color: var(--vscode-activityBarBadge-background);
-        }
-
-        .action-card pre {
-            margin: 6px 0;
-            max-height: 300px;
-            overflow-y: auto;
-        }
-
-        .card-buttons {
-            display: flex;
-            gap: 6px;
-            margin-top: 6px;
-            flex-wrap: wrap;
-        }
-
-        .shell-card {
-            border-left-color: var(--vscode-terminal-ansiGreen);
-        }
-
-        .shell-card .card-title {
-            color: var(--vscode-terminal-ansiGreen);
-        }
-
-        .shell-result {
-            border-left-color: var(--vscode-terminal-ansiBrightBlack);
-        }
-
-        .shell-result .card-title {
-            color: var(--vscode-terminal-ansiBrightBlack);
-        }
-
-        #input-row {
-            display: flex;
-            gap: 4px;
-        }
-
-        textarea {
-            flex: 1;
-            background: var(--vscode-input-background);
-            color: var(--vscode-input-foreground);
-            border: 1px solid var(--vscode-input-border);
-            padding: 6px;
-            border-radius: 4px;
-            resize: none;
-            font-family: inherit;
-        }
-
-        button {
-            background: var(--vscode-button-background);
-            color: var(--vscode-button-foreground);
-            border: none;
-            padding: 6px 12px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 12px;
-        }
-
-        button:hover {
-            background: var(--vscode-button-hoverBackground);
-        }
-
-        button:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        .btn-apply {
-            background: var(--vscode-terminal-ansiGreen);
-            color: #000;
-        }
-
-        .btn-discard {
-            background: transparent;
-            color: var(--vscode-errorForeground);
-            border: 1px solid var(--vscode-errorForeground);
-        }
-
-        .btn-run {
-            background: var(--vscode-terminal-ansiGreen);
-            color: #000;
-        }
-
-        pre {
-            background: var(--vscode-editor-background);
-            padding: 8px;
-            border-radius: 4px;
-            overflow-x: auto;
-            font-family: var(--vscode-editor-font-family);
-            font-size: 12px;
-        }
-
-        code {
-            font-family: var(--vscode-editor-font-family);
-            font-size: 12px;
-            background: var(--vscode-editor-background);
-            padding: 1px 4px;
-            border-radius: 3px;
-        }
-
-        .confidence-high {
-            color: var(--vscode-terminal-ansiGreen);
-        }
-
-        .confidence-low {
-            color: var(--vscode-terminal-ansiYellow);
-        }
+        body { font-family: var(--vscode-font-family); padding: 8px; background: var(--vscode-sideBar-background); color: var(--vscode-foreground); font-size: 13px; }
+        #toolbar { display: flex; gap: 4px; margin-bottom: 8px; flex-wrap: wrap; align-items: center; }
+        #toolbar button { font-size: 11px; padding: 3px 8px; }
+        #btn-switch { margin-left: auto; background: var(--vscode-badge-background); color: var(--vscode-badge-foreground); }
+        #btn-clear { background: transparent; color: var(--vscode-descriptionForeground); border: 1px solid var(--vscode-input-border); }
+        #messages { height: calc(100vh - 200px); overflow-y: auto; margin-bottom: 8px; }
+        .msg { margin: 8px 0; padding: 8px; border-radius: 4px; word-wrap: break-word; }
+        .user { background: var(--vscode-input-background); text-align: right; }
+        .assistant { background: var(--vscode-editor-inactiveSelectionBackground); white-space: normal; }
+        .error { color: var(--vscode-errorForeground); background: var(--vscode-inputValidation-errorBackground); padding: 6px 8px; border-radius: 4px; }
+        .system { color: var(--vscode-descriptionForeground); font-style: italic; font-size: 11px; text-align: center; }
+        .card { margin: 6px 0; padding: 8px; border-radius: 4px; background: var(--vscode-editor-inactiveSelectionBackground); border-left: 3px solid var(--vscode-activityBarBadge-background); }
+        .card-title { font-size: 11px; font-weight: bold; margin-bottom: 4px; }
+        .card.goal { border-left-color: #569cd6; }
+        .card.goal .card-title { color: #569cd6; }
+        .card.subgoal { border-left-color: #9cdcfe; }
+        .card.subgoal .card-title { color: #9cdcfe; }
+        .card.running { border-left-color: #dcdcaa; }
+        .card.running .card-title { color: #dcdcaa; }
+        .card.result { border-left-color: #4ec9b0; }
+        .card.result .card-title { color: #4ec9b0; }
+        .card.result.has-error { border-left-color: var(--vscode-errorForeground); }
+        .card.result.has-error .card-title { color: var(--vscode-errorForeground); }
+        .card.done-finished { border-left-color: #4ec9b0; }
+        .card.done-finished .card-title { color: #4ec9b0; }
+        .card.done-aborted { border-left-color: var(--vscode-errorForeground); }
+        .card.done-aborted .card-title { color: var(--vscode-errorForeground); }
+        .card.done-max { border-left-color: #dcdcaa; }
+        .card.done-max .card-title { color: #dcdcaa; }
+        .iteration-badge { display: inline-block; font-size: 10px; padding: 1px 6px; border-radius: 10px; background: var(--vscode-badge-background); color: var(--vscode-badge-foreground); margin-bottom: 4px; }
+        pre { background: var(--vscode-editor-background); padding: 6px 8px; border-radius: 3px; overflow-x: auto; font-family: var(--vscode-editor-font-family); font-size: 12px; margin: 4px 0; max-height: 200px; overflow-y: auto; }
+        code { font-family: var(--vscode-editor-font-family); font-size: 12px; background: var(--vscode-editor-background); padding: 1px 4px; border-radius: 3px; }
+        #input-row { display: flex; gap: 4px; }
+        textarea { flex: 1; background: var(--vscode-input-background); color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border); padding: 6px; border-radius: 4px; resize: none; font-family: inherit; }
+        button { background: var(--vscode-button-background); color: var(--vscode-button-foreground); border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+        button:hover { background: var(--vscode-button-hoverBackground); }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
     </style>
 </head>
-
 <body>
-
     <div id="toolbar">
-        <!-- <button id="btn-read">📄 File</button>
+        <button id="btn-read">📄 File</button>
         <button id="btn-open">📂 Open</button>
         <button id="btn-list">🗂 List</button>
-        <button id="btn-selection">✂️ Select</button>
-        <button id="btn-clear">🗑 Clear</button> -->
+        <button id="btn-clear">🗑 Clear</button>
         <button id="btn-switch">🔄 <span id="provider-name">sarvam</span></button>
     </div>
-
-    <div id="file-info"></div>
     <div id="messages"></div>
-
     <div id="input-row">
-        <textarea id="input" rows="3"
-            placeholder="Ask about your code, request edits...&#10;(Shift+Enter for newline)"></textarea>
+        <textarea id="input" rows="3" placeholder="Describe what you want to build or fix...&#10;(Shift+Enter for newline)"></textarea>
         <button id="btn-send">Send</button>
     </div>
 
@@ -233,295 +59,214 @@
         const vscode = acquireVsCodeApi();
         const messagesEl = document.getElementById('messages');
         const inputEl = document.getElementById('input');
-        const fileInfoEl = document.getElementById('file-info');
         const providerNameEl = document.getElementById('provider-name');
 
-        // ── Toolbar ───────────────────────────────────────────────────────
-        // document.getElementById('btn-read').addEventListener('click', () => {
-        //     vscode.postMessage({ type: 'readFile' });
-        // });
-        // document.getElementById('btn-open').addEventListener('click', () => {
-        //     vscode.postMessage({ type: 'openFile' });
-        // });
-        // document.getElementById('btn-list').addEventListener('click', () => {
-        //     vscode.postMessage({ type: 'listFiles' });
-        // });
-        // document.getElementById('btn-selection').addEventListener('click', () => {
-        //     addMessage('(Using selected text as context)', 'system');
-        //     vscode.postMessage({ type: 'readFile' });
-        // });
-        // document.getElementById('btn-clear').addEventListener('click', () => {
-        //     vscode.postMessage({ type: 'clearHistory' });
-        // });
-        document.getElementById('btn-switch').addEventListener('click', () => {
-            vscode.postMessage({ type: 'switchProvider' });
-        });
+        document.getElementById('btn-read').addEventListener('click', () => vscode.postMessage({ type: 'readFile' }));
+        document.getElementById('btn-open').addEventListener('click', () => vscode.postMessage({ type: 'openFile' }));
+        document.getElementById('btn-list').addEventListener('click', () => vscode.postMessage({ type: 'listFiles' }));
+        document.getElementById('btn-clear').addEventListener('click', () => vscode.postMessage({ type: 'clearHistory' }));
+        document.getElementById('btn-switch').addEventListener('click', () => vscode.postMessage({ type: 'switchProvider' }));
         document.getElementById('btn-send').addEventListener('click', send);
 
         inputEl.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                send();
-            }
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
         });
 
-        // ── Send ──────────────────────────────────────────────────────────
         function send() {
             const text = inputEl.value.trim();
-            if (!text) return;
+            if (!text) { return; }
             addMessage(text, 'user');
             inputEl.value = '';
             vscode.postMessage({ type: 'ask', text });
         }
 
-        // ── Plain message ─────────────────────────────────────────────────
         function addMessage(text, cls) {
             const div = document.createElement('div');
             div.className = 'msg ' + cls;
-            if (cls === 'assistant') {
-                div.innerHTML = renderMarkdown(text);
-            } else {
-                div.textContent = text;
-            }
+            div.innerHTML = cls === 'assistant' ? renderMarkdown(text) : escapeHtml(text);
             messagesEl.appendChild(div);
-            messagesEl.scrollTop = messagesEl.scrollHeight;
+            scroll();
         }
 
-        // ── Edit card (no auto apply) ─────────────────────────────────────
-        function addEditCard(text, code, confidence) {
-            if (text) addMessage(text, 'assistant');
-
-            const capturedCode = code;
+        function addCard(cls, title, body) {
             const card = document.createElement('div');
-            card.className = 'action-card';
-
-            const title = document.createElement('div');
-            title.className = 'card-title';
-            const confClass = confidence === 'HIGH' ? 'confidence-high' : 'confidence-low';
-            const confIcon = confidence === 'HIGH' ? '⚡' : '⚠️';
-            title.innerHTML = `${confIcon} Edit suggestion — <span class="${confClass}">${confidence} confidence</span>`;
-            card.appendChild(title);
-
-            const pre = document.createElement('pre');
-            pre.textContent = capturedCode;
-            card.appendChild(pre);
-
-            const btns = document.createElement('div');
-            btns.className = 'card-buttons';
-
-            const applyBtn = document.createElement('button');
-            applyBtn.className = 'btn-apply';
-            applyBtn.textContent = '✅ Apply';
-            applyBtn.addEventListener('click', () => {
-                vscode.postMessage({ type: 'applyEdit', code: capturedCode });
-                applyBtn.disabled = true;
-                applyBtn.textContent = 'Applying...';
-            });
-
-            const discardBtn = document.createElement('button');
-            discardBtn.className = 'btn-discard';
-            discardBtn.textContent = '❌ Discard';
-            discardBtn.addEventListener('click', () => card.remove());
-
-            btns.appendChild(applyBtn);
-            btns.appendChild(discardBtn);
-            card.appendChild(btns);
-
-            messagesEl.appendChild(card);
-            messagesEl.scrollTop = messagesEl.scrollHeight;
-        }
-
-        // ── Create file card ──────────────────────────────────────────────
-        function addCreateFileCard(text, filename, code) {
-            if (text) addMessage(text, 'assistant');
-
-            const capturedFilename = filename;
-            const capturedCode = code;
-
-            const card = document.createElement('div');
-            card.className = 'action-card';
-
-            const title = document.createElement('div');
-            title.className = 'card-title';
-            title.textContent = `📄 Create file: ${capturedFilename}`;
-            card.appendChild(title);
-
-            const pre = document.createElement('pre');
-            pre.textContent = capturedCode;
-            card.appendChild(pre);
-
-            const btns = document.createElement('div');
-            btns.className = 'card-buttons';
-
-            const createBtn = document.createElement('button');
-            createBtn.className = 'btn-apply';
-            createBtn.textContent = `💾 Create ${capturedFilename}`;
-            createBtn.addEventListener('click', () => {
-                vscode.postMessage({ type: 'createFile', filename: capturedFilename, code: capturedCode });
-                createBtn.disabled = true;
-                createBtn.textContent = '✅ Creating...';
-            });
-
-            const discardBtn = document.createElement('button');
-            discardBtn.className = 'btn-discard';
-            discardBtn.textContent = '❌ Discard';
-            discardBtn.addEventListener('click', () => card.remove());
-
-            btns.appendChild(createBtn);
-            btns.appendChild(discardBtn);
-            card.appendChild(btns);
-
-            messagesEl.appendChild(card);
-            messagesEl.scrollTop = messagesEl.scrollHeight;
-        }
-
-        // ── Shell command card ────────────────────────────────────────────
-        function addShellCard(text, command) {
-            if (text) addMessage(text, 'assistant');
-
-            const capturedCommand = command;
-
-            const card = document.createElement('div');
-            card.className = 'action-card shell-card';
-
-            const title = document.createElement('div');
-            title.className = 'card-title';
-            title.textContent = '$ Shell command';
-            card.appendChild(title);
-
-            const pre = document.createElement('pre');
-            pre.textContent = capturedCommand;
-            card.appendChild(pre);
-
-            const btns = document.createElement('div');
-            btns.className = 'card-buttons';
-
-            const runBtn = document.createElement('button');
-            runBtn.className = 'btn-run';
-            runBtn.textContent = '▶ Run';
-            runBtn.addEventListener('click', () => {
-                vscode.postMessage({ type: 'runShell', command: capturedCommand });
-                runBtn.disabled = true;
-                runBtn.textContent = 'Running...';
-            });
-
-            const discardBtn = document.createElement('button');
-            discardBtn.className = 'btn-discard';
-            discardBtn.textContent = '❌ Skip';
-            discardBtn.addEventListener('click', () => card.remove());
-
-            btns.appendChild(runBtn);
-            btns.appendChild(discardBtn);
-            card.appendChild(btns);
-
-            messagesEl.appendChild(card);
-            messagesEl.scrollTop = messagesEl.scrollHeight;
-        }
-
-        // ── Shell result card ─────────────────────────────────────────────
-        function addShellResultCard(command, stdout, stderr) {
-            const card = document.createElement('div');
-            card.className = 'action-card shell-result';
-
-            const title = document.createElement('div');
-            title.className = 'card-title';
-            title.textContent = `$ ${command}`;
-            card.appendChild(title);
-
-            if (stdout) {
+            card.className = 'card ' + cls;
+            const t = document.createElement('div');
+            t.className = 'card-title';
+            t.textContent = title;
+            card.appendChild(t);
+            if (body) {
                 const pre = document.createElement('pre');
-                pre.textContent = stdout;
+                pre.textContent = body;
                 card.appendChild(pre);
             }
-
-            if (stderr) {
-                const err = document.createElement('pre');
-                err.style.color = 'var(--vscode-errorForeground)';
-                err.textContent = '⚠️ ' + stderr;
-                card.appendChild(err);
-            }
-
             messagesEl.appendChild(card);
-            messagesEl.scrollTop = messagesEl.scrollHeight;
+            scroll();
+            return card;
         }
 
-        // ── Markdown renderer ─────────────────────────────────────────────
+        function scroll() { messagesEl.scrollTop = messagesEl.scrollHeight; }
+
+        function escapeHtml(text) {
+            return text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        }
+
         function renderMarkdown(text) {
             return text
+                .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
                 .replace(/```(\w+)?\n([\s\S]*?)```/g, '<pre>$2</pre>')
                 .replace(/`([^`]+)`/g, '<code>$1</code>')
                 .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
                 .replace(/\n/g, '<br>');
         }
 
-        function showFileInfo(filePath) {
-            fileInfoEl.style.display = 'block';
-            fileInfoEl.textContent = '📄 ' + filePath;
+        // Track current iteration group
+        let currentIterationEl = null;
+
+        function getOrCreateIterationGroup(iteration, max) {
+            const id = 'iter-' + iteration;
+            let el = document.getElementById(id);
+            if (!el) {
+                el = document.createElement('div');
+                el.id = id;
+                el.style.cssText = 'margin: 8px 0; padding: 6px; border-radius: 4px; border: 1px solid var(--vscode-input-border);';
+                const badge = document.createElement('div');
+                badge.className = 'iteration-badge';
+                badge.textContent = `Iteration ${iteration} / ${max}`;
+                el.appendChild(badge);
+                messagesEl.appendChild(el);
+                scroll();
+            }
+            currentIterationEl = el;
+            return el;
         }
 
-        function addShellRunningCard(command) {
-            const card = document.createElement('div');
-            card.className = 'action-card shell-card';
-            card.id = 'running-' + btoa(command).slice(0, 10);
-
-            const title = document.createElement('div');
-            title.className = 'card-title';
-            title.textContent = '⏳ Running...';
-            card.appendChild(title);
-
-            const pre = document.createElement('pre');
-            pre.textContent = command;
-            card.appendChild(pre);
-
-            messagesEl.appendChild(card);
-            messagesEl.scrollTop = messagesEl.scrollHeight;
+        function addToIteration(iteration, max, childEl) {
+            const group = getOrCreateIterationGroup(iteration, max);
+            group.appendChild(childEl);
+            scroll();
         }
 
-        // ── Message handler ───────────────────────────────────────────────
+        let lastIteration = { n: 0, max: 0 };
+
         window.addEventListener('message', (e) => {
             const msg = e.data;
 
-            if (msg.type === 'reply') {
-                if (msg.code && msg.confidence) {
-                    addEditCard(msg.text, msg.code, msg.confidence);
-                    return;
-                }
-                if (msg.createFile) {
-                    addCreateFileCard(msg.text, msg.createFile.filename, msg.createFile.code);
-                    return;
-                }
-                // ↓ removed shellCommands check — commands now auto-run server side
-                addMessage(msg.text, 'assistant');
+            if (msg.type === 'agentIteration') {
+                lastIteration = { n: msg.iteration, max: msg.max };
+                getOrCreateIterationGroup(msg.iteration, msg.max);
+            }
+
+            if (msg.type === 'agentGoal') {
+                const card = document.createElement('div');
+                card.className = 'card goal';
+                card.innerHTML = '<div class="card-title">🎯 Goal</div><div>' + escapeHtml(msg.goal) + '</div>';
+                if (currentIterationEl) { currentIterationEl.appendChild(card); }
+                else { messagesEl.appendChild(card); }
+                scroll();
+            }
+
+            if (msg.type === 'agentSubGoal') {
+                const card = document.createElement('div');
+                card.className = 'card subgoal';
+                card.innerHTML = '<div class="card-title">📋 ' + escapeHtml(msg.title) + '</div>';
+                if (currentIterationEl) { currentIterationEl.appendChild(card); }
+                else { messagesEl.appendChild(card); }
+                scroll();
             }
 
             if (msg.type === 'shellRunning') {
-                addShellRunningCard(msg.command);
+                const card = document.createElement('div');
+                card.className = 'card running';
+                card.id = 'running-' + btoa(msg.command).slice(0, 12);
+                card.innerHTML = '<div class="card-title">⏳ Running</div><pre>' + escapeHtml(msg.command) + '</pre>';
+                if (currentIterationEl) { currentIterationEl.appendChild(card); }
+                else { messagesEl.appendChild(card); }
+                scroll();
             }
 
             if (msg.type === 'shellResult') {
-                const runningId = 'running-' + btoa(msg.command).slice(0, 10);
+                // Replace running card if exists
+                const runningId = 'running-' + btoa(msg.command).slice(0, 12);
                 const runningCard = document.getElementById(runningId);
-                if (runningCard) runningCard.remove();
-                addShellResultCard(msg.command, msg.stdout, msg.stderr);
+
+                const hasError = !!msg.stderr;
+                const card = document.createElement('div');
+                card.className = 'card result' + (hasError ? ' has-error' : '');
+
+                const icon = hasError ? '❌' : '✅';
+                const shortCmd = msg.command.length > 60 ? msg.command.slice(0, 60) + '...' : msg.command;
+                card.innerHTML = '<div class="card-title">' + icon + ' $ ' + escapeHtml(shortCmd) + '</div>';
+
+                if (msg.stdout && msg.stdout !== '(no output)') {
+                    const pre = document.createElement('pre');
+                    pre.textContent = msg.stdout;
+                    card.appendChild(pre);
+                }
+                if (msg.stderr) {
+                    const pre = document.createElement('pre');
+                    pre.style.color = 'var(--vscode-errorForeground)';
+                    pre.textContent = msg.stderr;
+                    card.appendChild(pre);
+                }
+
+                if (runningCard) {
+                    runningCard.replaceWith(card);
+                } else {
+                    if (currentIterationEl) { currentIterationEl.appendChild(card); }
+                    else { messagesEl.appendChild(card); }
+                }
+                scroll();
+            }
+
+            if (msg.type === 'agentDone') {
+                const statusMap = {
+                    'FINISHED':       { cls: 'done-finished', icon: '✅', label: 'Done' },
+                    'ABORTED':        { cls: 'done-aborted',  icon: '🛑', label: 'Aborted' },
+                    'TERMINATED':     { cls: 'done-aborted',  icon: '🛑', label: 'Terminated' },
+                    'MAX_ITERATIONS': { cls: 'done-max',      icon: '⚠️', label: 'Max iterations reached' },
+                };
+                const s = statusMap[msg.status] ?? { cls: 'done-finished', icon: '✅', label: msg.status };
+                const card = document.createElement('div');
+                card.className = 'card ' + s.cls;
+                card.innerHTML = '<div class="card-title">' + s.icon + ' ' + s.label + '</div>';
+                if (msg.message) {
+                    const p = document.createElement('div');
+                    p.style.fontSize = '11px';
+                    p.textContent = msg.message;
+                    card.appendChild(p);
+                }
+                messagesEl.appendChild(card);
+                currentIterationEl = null;
+                scroll();
+            }
+
+            if (msg.type === 'reply') {
+                addMessage(msg.text, 'assistant');
             }
 
             if (msg.type === 'error') {
                 addMessage('❌ ' + msg.text, 'error');
             }
+
             if (msg.type === 'editApplied') {
-                addMessage('✅ Done! File saved.', 'system');
+                addMessage('✅ File saved.', 'system');
             }
+
             if (msg.type === 'fileContent') {
-                showFileInfo(msg.path);
                 addMessage('📄 Loaded: ' + msg.path, 'system');
             }
+
             if (msg.type === 'fileList') {
                 addMessage('📁 Files:\n' + msg.files.join('\n'), 'assistant');
             }
+
             if (msg.type === 'historyCleared') {
                 messagesEl.innerHTML = '';
+                currentIterationEl = null;
                 addMessage('🗑 History cleared', 'system');
             }
+
             if (msg.type === 'providerChanged') {
                 providerNameEl.textContent = msg.provider;
                 addMessage('🔄 Switched to ' + msg.provider, 'system');
@@ -529,5 +274,4 @@
         });
     </script>
 </body>
-
 </html>

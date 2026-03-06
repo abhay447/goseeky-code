@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { ChatManager } from "../providers";
-import { AgentState, askAI, applyEdit, createFile, runShell, switchProvider } from "./agentExecution";
-import { buildSystemPrompt, getCurrentFileContext } from "././webviewRenderer";
+import { AgentState, applyEdit, createFile, runShell, runAgenticLoop, switchProvider } from "./agentExecution";
+import { getCurrentFileContext } from "./webviewRenderer";
 
 export { AgentState };
 
@@ -13,29 +13,20 @@ export async function handleAgentMessage(
     webviewView: vscode.WebviewView,
     msg: any
 ) {
-    // ── Switch provider ─────────────────────────────────────────────────────
     if (msg.type === "switchProvider") {
         await switchProvider(state, chatManager, context, webviewView);
     }
 
-    // ── Chat ────────────────────────────────────────────────────────────────
     if (msg.type === "ask") {
         if (!state.activeProvider) {
             webviewView.webview.postMessage({ type: "error", text: "No API key set. Run 'Goseeky: Set API Key'." });
             return;
         }
-        try {
-            const fileContext = getCurrentFileContext(lastActiveEditor);
-            const systemPrompt = buildSystemPrompt(fileContext);
-            const config = vscode.workspace.getConfiguration("goseeky-code");
-            const temperature = config.get<number>("temperature", 0.2);
-            await askAI(state, chatManager, systemPrompt, msg.text, temperature, webviewView);
-        } catch (e: any) {
-            webviewView.webview.postMessage({ type: "error", text: e.message });
-        }
+        const config = vscode.workspace.getConfiguration("goseeky-code");
+        const temperature = config.get<number>("temperature", 0.0);
+        await runAgenticLoop(state, chatManager, msg.text, temperature, webviewView);
     }
 
-    // ── Read file via shell ─────────────────────────────────────────────────
     if (msg.type === "readFile") {
         const ctx = getCurrentFileContext(lastActiveEditor);
         if (!ctx) { webviewView.webview.postMessage({ type: "error", text: "No file open" }); return; }
@@ -45,17 +36,14 @@ export async function handleAgentMessage(
         } catch (e: any) { webviewView.webview.postMessage({ type: "error", text: e.message }); }
     }
 
-    // ── Apply edit ──────────────────────────────────────────────────────────
     if (msg.type === "applyEdit") {
         await applyEdit(msg.code, lastActiveEditor, webviewView);
     }
 
-    // ── Create file ─────────────────────────────────────────────────────────
     if (msg.type === "createFile") {
         await createFile(msg.filename, msg.code, webviewView);
     }
 
-    // ── Open file picker ────────────────────────────────────────────────────
     if (msg.type === "openFile") {
         const uris = await vscode.window.showOpenDialog({ canSelectMany: false });
         if (uris && uris[0]) {
@@ -69,20 +57,15 @@ export async function handleAgentMessage(
         }
     }
 
-    // ── List workspace files ────────────────────────────────────────────────
     if (msg.type === "listFiles") {
         const cwd = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
         try {
-            const { stdout } = await runShell(
-                `find . -not -path '*/node_modules/*' -not -path '*/.git/*' -not -path '*/out/*' -type f`,
-                cwd
-            );
+            const { stdout } = await runShell(`find . -not -path '*/node_modules/*' -not -path '*/.git/*' -not -path '*/out/*' -type f`, cwd);
             const names = stdout.trim().split("\n").filter(Boolean);
             webviewView.webview.postMessage({ type: "fileList", files: names });
         } catch (e: any) { webviewView.webview.postMessage({ type: "error", text: e.message }); }
     }
 
-    // ── Run shell command (manual) ──────────────────────────────────────────
     if (msg.type === "runShell") {
         try {
             const { stdout, stderr } = await runShell(msg.command);
@@ -92,7 +75,6 @@ export async function handleAgentMessage(
         }
     }
 
-    // ── Clear history ───────────────────────────────────────────────────────
     if (msg.type === "clearHistory") {
         chatManager.clear();
         webviewView.webview.postMessage({ type: "historyCleared" });
