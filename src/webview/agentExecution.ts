@@ -29,6 +29,13 @@ interface CommandResult {
     error?: string;
 }
 
+// ── Stop flag ─────────────────────────────────────────────────────────────────
+let stopRequested = false;
+
+export function requestStop() {
+    stopRequested = true;
+}
+
 // ── Shell executor ────────────────────────────────────────────────────────────
 export function runShell(command: string, cwd?: string): Promise<{ stdout: string; stderr: string }> {
     return new Promise((resolve, reject) => {
@@ -58,7 +65,6 @@ function extractAllTags(text: string, tag: string): string[] {
     while (idx !== -1) {
         const endIdx = text.indexOf(endTag, idx + startTag.length);
         if (endIdx === -1) {
-            // unclosed — take to end of string
             results.push(text.slice(idx + startTag.length).trim());
             break;
         }
@@ -71,14 +77,10 @@ function extractAllTags(text: string, tag: string): string[] {
 // ── Parse agent XML response ──────────────────────────────────────────────────
 export function parseAgentResponse(raw: string): AgentResponse {
     const responseBlock = extractTag(raw, "response") || raw;
-
     const goal = extractTag(responseBlock, "goal");
     const stage = extractTag(responseBlock, "stage");
-
-    // Extract top-level status — last one wins to avoid matching sub-goal status
     const allStatuses = extractAllTags(responseBlock, "status");
     const status = allStatuses[allStatuses.length - 1] ?? "";
-
     const subGoalBlocks = extractAllTags(responseBlock, "sub-goal");
     const subGoals: SubGoal[] = subGoalBlocks.map(sg => {
         const title = extractTag(sg, "title");
@@ -87,7 +89,6 @@ export function parseAgentResponse(raw: string): AgentResponse {
         const commands = extractAllTags(commandsBlock || sg, "run-shell");
         return { title, status: sgStatus, commands };
     });
-
     return { goal, stage, subGoals, status };
 }
 
@@ -108,6 +109,8 @@ async function executeSubGoals(
         });
 
         for (const command of sg.commands) {
+            if (stopRequested) { return results; }
+
             webviewView.webview.postMessage({ type: "shellRunning", command });
 
             try {
@@ -119,7 +122,6 @@ async function executeSubGoals(
                     stdout: stdout || "(no output)",
                     stderr: stderr || ""
                 });
-                // Reload editor after each file-touching command
                 await vscode.commands.executeCommand("workbench.action.files.revert");
             } catch (e: any) {
                 results.push({ command, stdout: "", stderr: "", error: e.message });
@@ -130,6 +132,8 @@ async function executeSubGoals(
                     stderr: e.message
                 });
             }
+
+            if (stopRequested) { return results; }
         }
     }
 
@@ -158,6 +162,7 @@ export async function runAgenticLoop(
     temperature: number,
     webviewView: vscode.WebviewView
 ): Promise<void> {
+    stopRequested = false;
     const MAX_ITERATIONS = 20;
     let iteration = 0;
     let accumulatedResults: CommandResult[] = [];
@@ -166,16 +171,20 @@ export async function runAgenticLoop(
     while (iteration < MAX_ITERATIONS) {
         iteration++;
 
+        if (stopRequested) {
+            webviewView.webview.postMessage({ type: "agentDone", status: "STOPPED" });
+            return;
+        }
+
         webviewView.webview.postMessage({ type: "agentIteration", iteration, max: MAX_ITERATIONS });
 
-        // Rebuild system prompt with latest file context each iteration
         const systemPrompt = buildSystemPrompt();
 
-        // On first turn use raw user text; subsequent turns feed back results
         const userMessage = accumulatedResults.length === 0
             ? userText
             : `Original goal: ${userText}\n\nResults from previous commands:\n${formatResultsForAI(accumulatedResults)}\n\nContinue working towards the goal. If done, set status to FINISHED.`;
 
+        // reply already has thinking blocks stripped by ChatManager
         let reply: string;
         try {
             reply = await chatManager.chat(
@@ -184,49 +193,65 @@ export async function runAgenticLoop(
                 { role: "user", content: userMessage },
                 { temperature }
             );
+            console.log("=== RAW REPLY ===");
+console.log(JSON.stringify(reply));
+console.log("=== END RAW REPLY ===");
         } catch (e: any) {
             webviewView.webview.postMessage({ type: "error", text: e.message });
             return;
         }
 
+        if (stopRequested) {
+            webviewView.webview.postMessage({ type: "agentDone", status: "STOPPED" });
+            return;
+        }
+
         const parsed = parseAgentResponse(reply);
 
-        // Show goal once
         if (!goalShown && parsed.goal) {
             webviewView.webview.postMessage({ type: "agentGoal", goal: parsed.goal });
             goalShown = true;
         }
 
-        // Show any explanation text outside the XML block
-        const cleanReply = reply.replace(/<response>[\s\S]*<\/response>/g, "").trim();
-        if (cleanReply) {
-            webviewView.webview.postMessage({ type: "reply", text: cleanReply });
-        }
+        // const outsideResponse = reply.replace(/<response>[\s\S]*<\/response>/g, "").trim();
+        // if (outsideResponse) {
+        //     webviewView.webview.postMessage({ type: "reply", text: outsideResponse });
+        // } else if (!hasCommands && parsed.goal) {
+        //     // Fallback: model put everything inside XML — show goal as reply
+        //     webviewView.webview.postMessage({ type: "reply", text: parsed.goal });
+        // }
 
-        // Check for terminal status before executing
         const terminalStatus = ["FINISHED", "ABORTED", "TERMINATED"].includes(parsed.status.toUpperCase());
         const hasCommands = parsed.subGoals.some(sg => sg.commands.length > 0);
 
+        const outsideResponse = reply.replace(/<response>[\s\S]*<\/response>/g, "").trim();
+        if (outsideResponse) {
+            webviewView.webview.postMessage({ type: "reply", text: outsideResponse });
+        } else if (!hasCommands && parsed.goal) {
+            // Fallback: model put everything inside XML — show goal as reply
+            webviewView.webview.postMessage({ type: "reply", text: parsed.goal });
+        }
+
         if (!hasCommands && !terminalStatus) {
-            // AI returned no commands and no terminal status — treat as done
             webviewView.webview.postMessage({ type: "agentDone", status: "FINISHED" });
             return;
         }
 
         if (hasCommands) {
-            const iterationResults = await executeSubGoals(parsed.subGoals, webviewView);
-            accumulatedResults = iterationResults; // pass only latest results to next turn
+            accumulatedResults = await executeSubGoals(parsed.subGoals, webviewView);
+
+            if (stopRequested) {
+                webviewView.webview.postMessage({ type: "agentDone", status: "STOPPED" });
+                return;
+            }
         }
 
         if (terminalStatus) {
             webviewView.webview.postMessage({ type: "agentDone", status: parsed.status.toUpperCase() });
             return;
         }
-
-        // INPROGRESS — loop again with results
     }
 
-    // Hit max iterations
     webviewView.webview.postMessage({
         type: "agentDone",
         status: "MAX_ITERATIONS",

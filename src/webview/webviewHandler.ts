@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { ChatManager } from "../providers";
-import { AgentState, applyEdit, createFile, runShell, runAgenticLoop, switchProvider } from "./agentExecution";
+import { AgentState, applyEdit, createFile, runShell, runAgenticLoop, switchProvider, requestStop } from "./agentExecution";
 
 export { AgentState };
 
@@ -24,6 +24,10 @@ export async function handleAgentMessage(
         const config = vscode.workspace.getConfiguration("goseeky-code");
         const temperature = config.get<number>("temperature", 0.0);
         await runAgenticLoop(state, chatManager, msg.text, temperature, webviewView);
+    }
+
+    if (msg.type === "stopAgent") {
+        requestStop();
     }
 
     if (msg.type === "applyEdit") {

@@ -37,7 +37,7 @@
         }
 
         #messages {
-            height: calc(100vh - 200px);
+            height: calc(100vh - 210px);
             overflow-y: auto;
             margin-bottom: 8px;
         }
@@ -49,29 +49,11 @@
             word-wrap: break-word;
         }
 
-        .user {
-            background: var(--vscode-input-background);
-            text-align: right;
-        }
-
-        .assistant {
-            background: var(--vscode-editor-inactiveSelectionBackground);
-            white-space: normal;
-        }
-
-        .error {
-            color: var(--vscode-errorForeground);
-            background: var(--vscode-inputValidation-errorBackground);
-            padding: 6px 8px;
-            border-radius: 4px;
-        }
-
-        .system {
-            color: var(--vscode-descriptionForeground);
-            font-style: italic;
-            font-size: 11px;
-            text-align: center;
-        }
+        .user { background: var(--vscode-input-background); text-align: right; }
+        .user.queued { opacity: 0.5; font-style: italic; }
+        .assistant { background: var(--vscode-editor-inactiveSelectionBackground); white-space: normal; }
+        .error { color: var(--vscode-errorForeground); background: var(--vscode-inputValidation-errorBackground); padding: 6px 8px; border-radius: 4px; }
+        .system { color: var(--vscode-descriptionForeground); font-style: italic; font-size: 11px; text-align: center; }
 
         .card {
             margin: 6px 0;
@@ -80,76 +62,21 @@
             background: var(--vscode-editor-inactiveSelectionBackground);
             border-left: 3px solid var(--vscode-activityBarBadge-background);
         }
-
-        .card-title {
-            font-size: 11px;
-            font-weight: bold;
-            margin-bottom: 4px;
-        }
-
-        .card.goal {
-            border-left-color: #569cd6;
-        }
-
-        .card.goal .card-title {
-            color: #569cd6;
-        }
-
-        .card.subgoal {
-            border-left-color: #9cdcfe;
-        }
-
-        .card.subgoal .card-title {
-            color: #9cdcfe;
-        }
-
-        .card.running {
-            border-left-color: #dcdcaa;
-        }
-
-        .card.running .card-title {
-            color: #dcdcaa;
-        }
-
-        .card.result {
-            border-left-color: #4ec9b0;
-        }
-
-        .card.result .card-title {
-            color: #4ec9b0;
-        }
-
-        .card.result.has-error {
-            border-left-color: var(--vscode-errorForeground);
-        }
-
-        .card.result.has-error .card-title {
-            color: var(--vscode-errorForeground);
-        }
-
-        .card.done-finished {
-            border-left-color: #4ec9b0;
-        }
-
-        .card.done-finished .card-title {
-            color: #4ec9b0;
-        }
-
-        .card.done-aborted {
-            border-left-color: var(--vscode-errorForeground);
-        }
-
-        .card.done-aborted .card-title {
-            color: var(--vscode-errorForeground);
-        }
-
-        .card.done-max {
-            border-left-color: #dcdcaa;
-        }
-
-        .card.done-max .card-title {
-            color: #dcdcaa;
-        }
+        .card-title { font-size: 11px; font-weight: bold; margin-bottom: 4px; }
+        .card.goal { border-left-color: #569cd6; }
+        .card.goal .card-title { color: #569cd6; }
+        .card.subgoal { border-left-color: #9cdcfe; }
+        .card.subgoal .card-title { color: #9cdcfe; }
+        .card.running { border-left-color: #dcdcaa; }
+        .card.running .card-title { color: #dcdcaa; }
+        .card.result { border-left-color: #4ec9b0; }
+        .card.result .card-title { color: #4ec9b0; }
+        .card.done-finished { border-left-color: #4ec9b0; }
+        .card.done-finished .card-title { color: #4ec9b0; }
+        .card.done-aborted { border-left-color: var(--vscode-errorForeground); }
+        .card.done-aborted .card-title { color: var(--vscode-errorForeground); }
+        .card.done-max { border-left-color: #dcdcaa; }
+        .card.done-max .card-title { color: #dcdcaa; }
 
         .iteration-badge {
             display: inline-block;
@@ -184,6 +111,7 @@
         #input-row {
             display: flex;
             gap: 4px;
+            align-items: flex-end;
         }
 
         textarea {
@@ -197,6 +125,25 @@
             font-family: inherit;
         }
 
+        textarea:disabled {
+            opacity: 0.6;
+        }
+
+        #btn-send {
+            min-width: 52px;
+        }
+
+        #btn-stop {
+            display: none;
+            background: var(--vscode-errorForeground);
+            color: #fff;
+            min-width: 52px;
+        }
+
+        #btn-stop:hover {
+            opacity: 0.85;
+        }
+
         button {
             background: var(--vscode-button-background);
             color: var(--vscode-button-foreground);
@@ -207,13 +154,15 @@
             font-size: 12px;
         }
 
-        button:hover {
-            background: var(--vscode-button-hoverBackground);
-        }
+        button:hover { background: var(--vscode-button-hoverBackground); }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
 
-        button:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
+        #queue-indicator {
+            font-size: 10px;
+            color: var(--vscode-descriptionForeground);
+            text-align: right;
+            margin-bottom: 2px;
+            min-height: 14px;
         }
     </style>
 </head>
@@ -227,10 +176,14 @@
         <button id="btn-switch">🔄 <span id="provider-name">sarvam</span></button>
     </div>
     <div id="messages"></div>
+    <div id="queue-indicator"></div>
     <div id="input-row">
         <textarea id="input" rows="3"
             placeholder="Describe what you want to build or fix...&#10;(Shift+Enter for newline)"></textarea>
-        <button id="btn-send">Send</button>
+        <div style="display:flex;flex-direction:column;gap:4px;">
+            <button id="btn-send">Send</button>
+            <button id="btn-stop">⏹ Stop</button>
+        </div>
     </div>
 
     <script>
@@ -238,26 +191,89 @@
         const messagesEl = document.getElementById('messages');
         const inputEl = document.getElementById('input');
         const providerNameEl = document.getElementById('provider-name');
+        const btnSend = document.getElementById('btn-send');
+        const btnStop = document.getElementById('btn-stop');
+        const queueIndicator = document.getElementById('queue-indicator');
 
+        // ── State ─────────────────────────────────────────────────────────
+        let isProcessing = false;
+        let isStopped = false;
+        const messageQueue = [];
+
+        // ── Queue management ──────────────────────────────────────────────
+        function setProcessing(val) {
+            isProcessing = val;
+            inputEl.disabled = val;
+            btnSend.style.display = val ? 'none' : 'block';
+            btnStop.style.display = val ? 'block' : 'none';
+            if (!val) {
+                isStopped = false;
+                updateQueueIndicator();
+                // Process next queued message if any
+                if (messageQueue.length > 0) {
+                    const next = messageQueue.shift();
+                    updateQueueIndicator();
+                    dispatchMessage(next);
+                }
+            }
+        }
+
+        function updateQueueIndicator() {
+            if (messageQueue.length === 0) {
+                queueIndicator.textContent = '';
+            } else {
+                queueIndicator.textContent = `⏳ ${messageQueue.length} message${messageQueue.length > 1 ? 's' : ''} queued`;
+            }
+        }
+
+        function dispatchMessage(text) {
+            setProcessing(true);
+            vscode.postMessage({ type: 'ask', text });
+        }
+
+        // ── Toolbar ───────────────────────────────────────────────────────
         document.getElementById('btn-read').addEventListener('click', () => vscode.postMessage({ type: 'readFile' }));
         document.getElementById('btn-open').addEventListener('click', () => vscode.postMessage({ type: 'openFile' }));
         document.getElementById('btn-list').addEventListener('click', () => vscode.postMessage({ type: 'listFiles' }));
         document.getElementById('btn-clear').addEventListener('click', () => vscode.postMessage({ type: 'clearHistory' }));
         document.getElementById('btn-switch').addEventListener('click', () => vscode.postMessage({ type: 'switchProvider' }));
-        document.getElementById('btn-send').addEventListener('click', send);
 
+        btnStop.addEventListener('click', () => {
+            isStopped = true;
+            messageQueue.length = 0; // also drain queue on stop
+            updateQueueIndicator();
+            vscode.postMessage({ type: 'stopAgent' });
+            addMessage('🛑 Stop requested — waiting for current command to finish...', 'system');
+        });
+
+        btnSend.addEventListener('click', send);
         inputEl.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
         });
 
+        // ── Send ──────────────────────────────────────────────────────────
         function send() {
             const text = inputEl.value.trim();
             if (!text) { return; }
-            addMessage(text, 'user');
             inputEl.value = '';
-            vscode.postMessage({ type: 'ask', text });
+            addMessage(text, 'user');
+
+            if (isProcessing) {
+                // Queue it
+                messageQueue.push(text);
+                updateQueueIndicator();
+                // Mark the message as queued visually
+                const msgs = messagesEl.querySelectorAll('.msg.user');
+                if (msgs.length > 0) {
+                    msgs[msgs.length - 1].classList.add('queued');
+                    msgs[msgs.length - 1].title = 'Queued — will send after current request finishes';
+                }
+            } else {
+                dispatchMessage(text);
+            }
         }
 
+        // ── Helpers ───────────────────────────────────────────────────────
         function addMessage(text, cls) {
             const div = document.createElement('div');
             div.className = 'msg ' + cls;
@@ -266,40 +282,24 @@
             scroll();
         }
 
-        function addCard(cls, title, body) {
-            const card = document.createElement('div');
-            card.className = 'card ' + cls;
-            const t = document.createElement('div');
-            t.className = 'card-title';
-            t.textContent = title;
-            card.appendChild(t);
-            if (body) {
-                const pre = document.createElement('pre');
-                pre.textContent = body;
-                card.appendChild(pre);
-            }
-            messagesEl.appendChild(card);
-            scroll();
-            return card;
-        }
-
         function scroll() { messagesEl.scrollTop = messagesEl.scrollHeight; }
 
         function escapeHtml(text) {
-            return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            return String(text).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
         }
 
         function renderMarkdown(text) {
             return text
-                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
                 .replace(/```(\w+)?\n([\s\S]*?)```/g, '<pre>$2</pre>')
                 .replace(/`([^`]+)`/g, '<code>$1</code>')
                 .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
                 .replace(/\n/g, '<br>');
         }
 
-        // Track current iteration group
+        // ── Iteration groups ──────────────────────────────────────────────
         let currentIterationEl = null;
+        let lastIteration = { n: 0, max: 0 };
 
         function getOrCreateIterationGroup(iteration, max) {
             const id = 'iter-' + iteration;
@@ -319,14 +319,13 @@
             return el;
         }
 
-        function addToIteration(iteration, max, childEl) {
-            const group = getOrCreateIterationGroup(iteration, max);
-            group.appendChild(childEl);
+        function appendToIteration(childEl) {
+            if (currentIterationEl) { currentIterationEl.appendChild(childEl); }
+            else { messagesEl.appendChild(childEl); }
             scroll();
         }
 
-        let lastIteration = { n: 0, max: 0 };
-
+        // ── Message handler ───────────────────────────────────────────────
         window.addEventListener('message', (e) => {
             const msg = e.data;
 
@@ -339,18 +338,14 @@
                 const card = document.createElement('div');
                 card.className = 'card goal';
                 card.innerHTML = '<div class="card-title">🎯 Goal</div><div>' + escapeHtml(msg.goal) + '</div>';
-                if (currentIterationEl) { currentIterationEl.appendChild(card); }
-                else { messagesEl.appendChild(card); }
-                scroll();
+                appendToIteration(card);
             }
 
             if (msg.type === 'agentSubGoal') {
                 const card = document.createElement('div');
                 card.className = 'card subgoal';
                 card.innerHTML = '<div class="card-title">📋 ' + escapeHtml(msg.title) + '</div>';
-                if (currentIterationEl) { currentIterationEl.appendChild(card); }
-                else { messagesEl.appendChild(card); }
-                scroll();
+                appendToIteration(card);
             }
 
             if (msg.type === 'shellRunning') {
@@ -358,51 +353,41 @@
                 card.className = 'card running';
                 card.id = 'running-' + btoa(msg.command).slice(0, 12);
                 card.innerHTML = '<div class="card-title">⏳ Running</div><pre>' + escapeHtml(msg.command) + '</pre>';
-                if (currentIterationEl) { currentIterationEl.appendChild(card); }
-                else { messagesEl.appendChild(card); }
-                scroll();
+                appendToIteration(card);
             }
 
             if (msg.type === 'shellResult') {
-                if (msg.type === 'shellResult') {
-                    const runningId = 'running-' + btoa(msg.command).slice(0, 12);
-                    const runningCard = document.getElementById(runningId);
+                const runningId = 'running-' + btoa(msg.command).slice(0, 12);
+                const runningCard = document.getElementById(runningId);
 
-                    const hasError = !!msg.stderr;
-                    const card = document.createElement('div');
-                    // neutral styling — no done/error coloring
-                    card.className = 'card result';
+                const card = document.createElement('div');
+                card.className = 'card result';
+                const shortCmd = msg.command.length > 60 ? msg.command.slice(0, 60) + '...' : msg.command;
+                card.innerHTML = '<div class="card-title">$ ' + escapeHtml(shortCmd) + '</div>';
 
-                    const shortCmd = msg.command.length > 60 ? msg.command.slice(0, 60) + '...' : msg.command;
-                    card.innerHTML = '<div class="card-title">$ ' + escapeHtml(shortCmd) + '</div>';
-
-                    if (msg.stdout && msg.stdout !== '(no output)') {
-                        const pre = document.createElement('pre');
-                        pre.textContent = msg.stdout;
-                        card.appendChild(pre);
-                    }
-                    if (msg.stderr) {
-                        const pre = document.createElement('pre');
-                        pre.style.color = 'var(--vscode-errorForeground)';
-                        pre.textContent = '⚠️ stderr: ' + msg.stderr;
-                        card.appendChild(pre);
-                    }
-
-                    if (runningCard) { runningCard.replaceWith(card); }
-                    else {
-                        if (currentIterationEl) { currentIterationEl.appendChild(card); }
-                        else { messagesEl.appendChild(card); }
-                    }
-                    scroll();
+                if (msg.stdout && msg.stdout !== '(no output)') {
+                    const pre = document.createElement('pre');
+                    pre.textContent = msg.stdout;
+                    card.appendChild(pre);
                 }
+                if (msg.stderr) {
+                    const pre = document.createElement('pre');
+                    pre.style.color = 'var(--vscode-errorForeground)';
+                    pre.textContent = '⚠️ stderr: ' + msg.stderr;
+                    card.appendChild(pre);
+                }
+
+                if (runningCard) { runningCard.replaceWith(card); }
+                else { appendToIteration(card); }
             }
 
             if (msg.type === 'agentDone') {
                 const statusMap = {
-                    'FINISHED': { cls: 'done-finished', icon: '✅', label: 'Done' },
-                    'ABORTED': { cls: 'done-aborted', icon: '🛑', label: 'Aborted' },
-                    'TERMINATED': { cls: 'done-aborted', icon: '🛑', label: 'Terminated' },
-                    'MAX_ITERATIONS': { cls: 'done-max', icon: '⚠️', label: 'Max iterations reached' },
+                    'FINISHED':       { cls: 'done-finished', icon: '✅', label: 'Done' },
+                    'ABORTED':        { cls: 'done-aborted',  icon: '🛑', label: 'Aborted' },
+                    'TERMINATED':     { cls: 'done-aborted',  icon: '🛑', label: 'Terminated' },
+                    'STOPPED':        { cls: 'done-aborted',  icon: '⏹',  label: 'Stopped by user' },
+                    'MAX_ITERATIONS': { cls: 'done-max',      icon: '⚠️', label: 'Max iterations reached' },
                 };
                 const s = statusMap[msg.status] ?? { cls: 'done-finished', icon: '✅', label: msg.status };
                 const card = document.createElement('div');
@@ -417,31 +402,28 @@
                 messagesEl.appendChild(card);
                 currentIterationEl = null;
                 scroll();
+                // Release processing lock — triggers queue drain
+                setProcessing(false);
+                // Un-queue the oldest queued message visually
+                const queued = messagesEl.querySelector('.msg.user.queued');
+                if (queued) { queued.classList.remove('queued'); }
             }
 
-            if (msg.type === 'reply') {
-                addMessage(msg.text, 'assistant');
-            }
-
+            if (msg.type === 'reply') { addMessage(msg.text, 'assistant'); }
             if (msg.type === 'error') {
                 addMessage('❌ ' + msg.text, 'error');
+                setProcessing(false);
             }
-
-            if (msg.type === 'editApplied') {
-                addMessage('✅ File saved.', 'system');
-            }
-
-            if (msg.type === 'fileContent') {
-                addMessage('📄 Loaded: ' + msg.path, 'system');
-            }
-
-            if (msg.type === 'fileList') {
-                addMessage('📁 Files:\n' + msg.files.join('\n'), 'assistant');
-            }
+            if (msg.type === 'editApplied') { addMessage('✅ File saved.', 'system'); }
+            if (msg.type === 'fileContent') { addMessage('📄 Loaded: ' + msg.path, 'system'); }
+            if (msg.type === 'fileList') { addMessage('📁 Files:\n' + msg.files.join('\n'), 'assistant'); }
 
             if (msg.type === 'historyCleared') {
                 messagesEl.innerHTML = '';
                 currentIterationEl = null;
+                messageQueue.length = 0;
+                updateQueueIndicator();
+                setProcessing(false);
                 addMessage('🗑 History cleared', 'system');
             }
 
@@ -452,5 +434,4 @@
         });
     </script>
 </body>
-
 </html>

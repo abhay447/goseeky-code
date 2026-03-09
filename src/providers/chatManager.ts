@@ -8,12 +8,24 @@ function estimateTokens(text: string): number {
   return Math.ceil(text.length / 4);
 }
 
+// ── Strip reasoning blocks from model output ──────────────────────────────────
+function stripThinkingBlocks(text: string): string {
+    // Remove fully closed <think>...</think> blocks
+    let result = text
+        .replace(/<think>[\s\S]*?<\/think>/gi, "")
+        .replace(/<thinking>[\s\S]*?<\/thinking>/gi, "");
+
+    // For unclosed <think> — just remove the opening tag, keep the content after it
+    result = result.replace(/<think>/gi, "").replace(/<thinking>/gi, "");
+
+    return result.trim();
+}
+
 export class ChatManager {
   private history: ChatMessage[] = [];
   private readonly storageKey = "goseeky.chatHistory";
 
   constructor(private context: vscode.ExtensionContext) {
-    // Load persisted history on startup
     this.history = this.context.globalState.get<ChatMessage[]>(this.storageKey, []);
   }
 
@@ -33,7 +45,7 @@ export class ChatManager {
     for (let i = recent.length - 1; i >= 0; i--) {
       const msg = recent[i];
       const tokens = estimateTokens(msg.content);
-      if (remainingTokens - tokens < 0) break;
+      if (remainingTokens - tokens < 0) { break; }
       trimmed.unshift(msg);
       remainingTokens -= tokens;
     }
@@ -42,11 +54,7 @@ export class ChatManager {
       trimmed.shift();
     }
 
-    return [
-      systemMsg,
-      ...trimmed,
-      userMsg
-    ];
+    return [systemMsg, ...trimmed, userMsg];
   }
 
   async chat(
@@ -56,12 +64,22 @@ export class ChatManager {
     options?: ChatOptions
   ): Promise<string> {
     const messages = this.getHistory(systemMsg, userMsg);
-    const reply = await client.chat(messages, options);
+    const rawReply = await client.chat(messages, options);
+
+    // console.log("=== RAW FROM API ===");
+    // console.log(JSON.stringify(rawReply));
+    // console.log("=== END RAW FROM API ===");
+
+    // Strip thinking blocks before storing in history or returning
+    const reply = stripThinkingBlocks(rawReply);
+
+    // console.log("=== AFTER STRIP ===");
+    // console.log(JSON.stringify(reply));
+    // console.log("=== END AFTER STRIP ===");
 
     this.history.push(userMsg);
     this.history.push({ role: "assistant", content: reply });
 
-    // Persist to globalState
     await this.context.globalState.update(this.storageKey, this.history);
 
     return reply;
