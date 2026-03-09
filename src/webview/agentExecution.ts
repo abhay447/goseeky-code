@@ -158,7 +158,7 @@ export async function runAgenticLoop(
     temperature: number,
     webviewView: vscode.WebviewView
 ): Promise<void> {
-    const MAX_ITERATIONS = 8;
+    const MAX_ITERATIONS = 20;
     let iteration = 0;
     let accumulatedResults: CommandResult[] = [];
     let goalShown = false;

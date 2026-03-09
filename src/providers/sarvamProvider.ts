@@ -13,7 +13,7 @@ export class SarvamProvider implements AIProvider {
       model: this.model,
       messages,
       temperature: options.temperature ?? 0.2,
-      max_tokens: options.maxTokens ?? 2048,
+      // max_tokens: options.maxTokens ?? 2048,
       stream: false,
     });
 
