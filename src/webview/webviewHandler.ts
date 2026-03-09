@@ -1,7 +1,6 @@
 import * as vscode from "vscode";
 import { ChatManager } from "../providers";
 import { AgentState, applyEdit, createFile, runShell, runAgenticLoop, switchProvider } from "./agentExecution";
-import { getCurrentFileContext } from "./webviewRenderer";
 
 export { AgentState };
 
@@ -25,15 +24,6 @@ export async function handleAgentMessage(
         const config = vscode.workspace.getConfiguration("goseeky-code");
         const temperature = config.get<number>("temperature", 0.0);
         await runAgenticLoop(state, chatManager, msg.text, temperature, webviewView);
-    }
-
-    if (msg.type === "readFile") {
-        const ctx = getCurrentFileContext(lastActiveEditor);
-        if (!ctx) { webviewView.webview.postMessage({ type: "error", text: "No file open" }); return; }
-        try {
-            const { stdout } = await runShell(`cat "${ctx.path}"`);
-            webviewView.webview.postMessage({ type: "fileContent", path: ctx.path, content: stdout, language: ctx.language });
-        } catch (e: any) { webviewView.webview.postMessage({ type: "error", text: e.message }); }
     }
 
     if (msg.type === "applyEdit") {

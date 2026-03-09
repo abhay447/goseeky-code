@@ -2,18 +2,6 @@ import * as vscode from "vscode";
 import * as os from 'os';
 import * as process from 'process';
 
-// ── Get current file context ──────────────────────────────────────────────────
-export function getCurrentFileContext(lastActiveEditor: vscode.TextEditor | undefined) {
-    const editor = vscode.window.activeTextEditor || lastActiveEditor;
-    if (!editor) { return null; }
-    return {
-        path: editor.document.fileName,
-        content: editor.document.getText(),
-        language: editor.document.languageId,
-        selection: editor.document.getText(editor.selection) || null
-    };
-}
-
 function getExtensionContextInfo() {
     // 1. Get Current Folder (Primary Workspace Root)
     const workspaceFolders = vscode.workspace.workspaceFolders;

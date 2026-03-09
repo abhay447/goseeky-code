@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import * as cp from "child_process";
 import { ChatManager, GeminiProvider, SarvamProvider } from "../providers";
-import { buildSystemPrompt, getCurrentFileContext } from "./webviewRenderer";
+import { buildSystemPrompt } from "./webviewRenderer";
 
 export interface AgentState {
     activeProvider: SarvamProvider | GeminiProvider | null;
@@ -169,7 +169,6 @@ export async function runAgenticLoop(
         webviewView.webview.postMessage({ type: "agentIteration", iteration, max: MAX_ITERATIONS });
 
         // Rebuild system prompt with latest file context each iteration
-        const fileContext = getCurrentFileContext(undefined);
         const systemPrompt = buildSystemPrompt();
 
         // On first turn use raw user text; subsequent turns feed back results
