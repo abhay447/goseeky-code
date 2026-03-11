@@ -75,20 +75,32 @@ function extractAllTags(text: string, tag: string): string[] {
 }
 
 // ── Parse agent XML response ──────────────────────────────────────────────────
+// Resilient: always extracts ALL <run-shell> commands from anywhere in the reply,
+// regardless of how mangled the XML structure is.
 export function parseAgentResponse(raw: string): AgentResponse {
-    const responseBlock = extractTag(raw, "response") || raw;
-    const goal = extractTag(responseBlock, "goal");
-    const stage = extractTag(responseBlock, "stage");
-    const allStatuses = extractAllTags(responseBlock, "status");
+    // Try to get goal/status from first <response> block if present
+    const firstResponseStart = raw.indexOf("<response>");
+    const firstResponseEnd = raw.indexOf("</response>");
+    const firstBlock = (firstResponseStart !== -1 && firstResponseEnd !== -1)
+        ? raw.slice(firstResponseStart, firstResponseEnd + "</response>".length)
+        : raw;
+
+    const goal = extractTag(firstBlock, "goal") || extractTag(raw, "goal");
+    const stage = extractTag(firstBlock, "stage") || extractTag(raw, "stage");
+
+    // Top-level status: look at last <status> tag in entire reply
+    const allStatuses = extractAllTags(raw, "status");
     const status = allStatuses[allStatuses.length - 1] ?? "";
-    const subGoalBlocks = extractAllTags(responseBlock, "sub-goal");
-    const subGoals: SubGoal[] = subGoalBlocks.map(sg => {
-        const title = extractTag(sg, "title");
-        const sgStatus = extractTag(sg, "status");
-        const commandsBlock = extractTag(sg, "commands");
-        const commands = extractAllTags(commandsBlock || sg, "run-shell");
-        return { title, status: sgStatus, commands };
-    });
+
+    // ── Flat command extraction — get ALL <run-shell> from entire reply ────────
+    // This is resilient to malformed/multiple <response> blocks
+    const allCommands = extractAllTags(raw, "run-shell");
+
+    // Group all commands into a single synthetic sub-goal
+    const subGoals: SubGoal[] = allCommands.length > 0
+        ? [{ title: goal || "Executing", status: "INPROGRESS", commands: allCommands }]
+        : [];
+
     return { goal, stage, subGoals, status };
 }
 
@@ -184,7 +196,6 @@ export async function runAgenticLoop(
             ? userText
             : `Original goal: ${userText}\n\nResults from previous commands:\n${formatResultsForAI(accumulatedResults)}\n\nContinue working towards the goal. If done, set status to FINISHED.`;
 
-        // reply already has thinking blocks stripped by ChatManager
         let reply: string;
         try {
             reply = await chatManager.chat(
@@ -193,9 +204,6 @@ export async function runAgenticLoop(
                 { role: "user", content: userMessage },
                 { temperature }
             );
-            console.log("=== RAW REPLY ===");
-console.log(JSON.stringify(reply));
-console.log("=== END RAW REPLY ===");
         } catch (e: any) {
             webviewView.webview.postMessage({ type: "error", text: e.message });
             return;
@@ -208,31 +216,56 @@ console.log("=== END RAW REPLY ===");
 
         const parsed = parseAgentResponse(reply);
 
+        // Show goal once
         if (!goalShown && parsed.goal) {
             webviewView.webview.postMessage({ type: "agentGoal", goal: parsed.goal });
             goalShown = true;
         }
 
-        // const outsideResponse = reply.replace(/<response>[\s\S]*<\/response>/g, "").trim();
-        // if (outsideResponse) {
-        //     webviewView.webview.postMessage({ type: "reply", text: outsideResponse });
-        // } else if (!hasCommands && parsed.goal) {
-        //     // Fallback: model put everything inside XML — show goal as reply
-        //     webviewView.webview.postMessage({ type: "reply", text: parsed.goal });
-        // }
+        // Show explanation text — prefer text before <response>, fall back to inside
+        const firstResponseIdx = reply.indexOf("<response>");
+        const lastResponseEnd = reply.lastIndexOf("</response>");
+        const outsideResponse = firstResponseIdx !== -1
+            ? reply.slice(0, firstResponseIdx).trim()
+            : "";
+
+        // Extract full inner content of all <response> blocks, strip XML tags, show as text
+        const insideResponse = (firstResponseIdx !== -1 && lastResponseEnd !== -1)
+            ? reply.slice(firstResponseIdx, lastResponseEnd + "</response>".length)
+                .replace(/<\/?response>/g, "")
+                .replace(/<goal>[\s\S]*?<\/goal>/g, "")
+                .replace(/<stage>[\s\S]*?<\/stage>/g, "")
+                .replace(/<status>[\s\S]*?<\/status>/g, "")
+                .replace(/<sub-goals>[\s\S]*?<\/sub-goals>/g, "")
+                .replace(/<sub-goal>[\s\S]*?<\/sub-goal>/g, "")
+                .replace(/<commands>[\s\S]*?<\/commands>/g, "")
+                .replace(/<run-shell>[\s\S]*?<\/run-shell>/g, "")
+                .replace(/<title>[\s\S]*?<\/title>/g, "")
+                .trim()
+            : "";
+
+        const displayText = [outsideResponse, insideResponse].filter(Boolean).join("\n\n");
+        if (displayText) {
+            webviewView.webview.postMessage({ type: "reply", text: displayText });
+        }
 
         const terminalStatus = ["FINISHED", "ABORTED", "TERMINATED"].includes(parsed.status.toUpperCase());
         const hasCommands = parsed.subGoals.some(sg => sg.commands.length > 0);
 
-        const outsideResponse = reply.replace(/<response>[\s\S]*<\/response>/g, "").trim();
-        if (outsideResponse) {
-            webviewView.webview.postMessage({ type: "reply", text: outsideResponse });
-        } else if (!hasCommands && parsed.goal) {
-            // Fallback: model put everything inside XML — show goal as reply
-            webviewView.webview.postMessage({ type: "reply", text: parsed.goal });
-        }
+        // console.log("=== DISPLAY DEBUG ===");
+        // console.log("outsideResponse:", JSON.stringify(outsideResponse));
+        // console.log("insideResponse:", JSON.stringify(insideResponse));
+        // console.log("displayText:", JSON.stringify(displayText));
+        // console.log("hasCommands:", hasCommands);
+        // console.log("terminalStatus:", terminalStatus);
+        // console.log("parsed.status:", JSON.stringify(parsed.status));
+        // console.log("=== END DISPLAY DEBUG ===");
 
         if (!hasCommands && !terminalStatus) {
+            // No commands, no terminal status — show goal as fallback if nothing shown yet
+            if (!displayText && parsed.goal) {
+                webviewView.webview.postMessage({ type: "reply", text: parsed.goal });
+            }
             webviewView.webview.postMessage({ type: "agentDone", status: "FINISHED" });
             return;
         }

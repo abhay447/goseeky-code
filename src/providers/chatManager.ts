@@ -1,8 +1,9 @@
 import * as vscode from "vscode";
 import { AIProvider, ChatMessage, ChatOptions } from "./types";
 
-const MAX_MESSAGES = 20;
-const MAX_TOKENS = 30000;
+
+const MAX_TOKENS = 3000; // conservative — leaves room for system prompt + response
+const MAX_MESSAGES = MAX_TOKENS/300;
 
 function estimateTokens(text: string): number {
   return Math.ceil(text.length / 4);
@@ -10,15 +11,23 @@ function estimateTokens(text: string): number {
 
 // ── Strip reasoning blocks from model output ──────────────────────────────────
 function stripThinkingBlocks(text: string): string {
-    // Remove fully closed <think>...</think> blocks
-    let result = text
-        .replace(/<think>[\s\S]*?<\/think>/gi, "")
-        .replace(/<thinking>[\s\S]*?<\/thinking>/gi, "");
+  // Remove fully closed <think>...</think> blocks
+  let result = text
+    .replace(/<think>[\s\S]*?<\/think>/gi, "")
+    .replace(/<thinking>[\s\S]*?<\/thinking>/gi, "");
 
-    // For unclosed <think> — just remove the opening tag, keep the content after it
-    result = result.replace(/<think>/gi, "").replace(/<thinking>/gi, "");
+  // For unclosed <think> — just remove the opening tag, keep the content after it
+  result = result.replace(/<think>/gi, "").replace(/<thinking>/gi, "");
 
-    return result.trim();
+  return result.trim();
+}
+
+// ── Truncate a single message if it's too long ────────────────────────────────
+function truncateMessage(msg: ChatMessage, maxTokens: number): ChatMessage {
+  const tokens = estimateTokens(msg.content);
+  if (tokens <= maxTokens) { return msg; }
+  const maxChars = maxTokens * 4;
+  return { ...msg, content: msg.content.slice(0, maxChars) + "\n...[truncated]" };
 }
 
 export class ChatManager {
@@ -35,9 +44,15 @@ export class ChatManager {
   }
 
   getHistory(systemMsg: ChatMessage, userMsg: ChatMessage): ChatMessage[] {
-    const systemTokens = estimateTokens(systemMsg.content);
-    const userTokens = estimateTokens(userMsg.content);
-    let remainingTokens = MAX_TOKENS - systemTokens - userTokens;
+    // Truncate system prompt if enormous (e.g. large file context)
+    const safeSystemMsg = truncateMessage(systemMsg, MAX_TOKENS/2);
+    // Truncate user message if enormous (e.g. large results feed-back)
+    const safeUserMsg = truncateMessage(userMsg, MAX_TOKENS/2);
+
+    const systemTokens = estimateTokens(safeSystemMsg.content);
+    const userTokens = estimateTokens(safeUserMsg.content);
+    const reservedForResponse = MAX_TOKENS/3;
+    let remainingTokens = MAX_TOKENS - systemTokens - userTokens - reservedForResponse;
 
     const trimmed: ChatMessage[] = [];
     const recent = this.history.slice(-MAX_MESSAGES);
@@ -50,11 +65,12 @@ export class ChatManager {
       remainingTokens -= tokens;
     }
 
+    // Ensure history starts with a user message
     while (trimmed.length > 0 && trimmed[0].role !== "user") {
       trimmed.shift();
     }
 
-    return [systemMsg, ...trimmed, userMsg];
+    return [safeSystemMsg, ...trimmed, safeUserMsg];
   }
 
   async chat(
@@ -65,17 +81,7 @@ export class ChatManager {
   ): Promise<string> {
     const messages = this.getHistory(systemMsg, userMsg);
     const rawReply = await client.chat(messages, options);
-
-    // console.log("=== RAW FROM API ===");
-    // console.log(JSON.stringify(rawReply));
-    // console.log("=== END RAW FROM API ===");
-
-    // Strip thinking blocks before storing in history or returning
     const reply = stripThinkingBlocks(rawReply);
-
-    // console.log("=== AFTER STRIP ===");
-    // console.log(JSON.stringify(reply));
-    // console.log("=== END AFTER STRIP ===");
 
     this.history.push(userMsg);
     this.history.push({ role: "assistant", content: reply });
