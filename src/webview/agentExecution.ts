@@ -175,7 +175,7 @@ export async function runAgenticLoop(
     webviewView: vscode.WebviewView
 ): Promise<void> {
     stopRequested = false;
-    const MAX_ITERATIONS = 20;
+    const MAX_ITERATIONS = 100;
     let iteration = 0;
     let accumulatedResults: CommandResult[] = [];
     let goalShown = false;
