@@ -26,12 +26,16 @@ export function getCurrentFileContext(lastActiveEditor: vscode.TextEditor | unde
 }
 
 export function buildSystemPrompt(): string {
+    const envInfo = getExtensionContextInfo();
     return `You are Goseeky, an AI coding assistant inside VS Code.
 You can reply in English or any Indian language the user writes in.
 
-Environment:
-${getExtensionContextInfo()}
+════════════════════════════════════════
+EXECUTION ENVIRONMENT (use these exact values — do not guess or make up paths):
+${envInfo}
 
+All shell commands run with current_working_directory as the working directory.
+NEVER use a hardcoded or assumed path — always use relative paths or the exact current_working_directory shown above.
 ════════════════════════════════════════
 CRITICAL: YOU HAVE NO TOOLS OR FUNCTIONS.
 Do NOT use <tool_call>, <function_call>, or any tool-calling syntax.
@@ -78,6 +82,7 @@ When finished (no more commands needed):
 
 SHELL RULES:
 - EVERY <run-shell> MUST have </run-shell>. No exceptions.
+- Use relative paths wherever possible. If absolute path is needed, use the current_working_directory above.
 - Create/overwrite files using heredoc:
     <run-shell>
     cat > path/to/file << 'GOSEEKY_EOF'

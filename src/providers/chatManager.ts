@@ -1,23 +1,42 @@
 import * as vscode from "vscode";
 import { AIProvider, ChatMessage, ChatOptions } from "./types";
 
-
-const MAX_TOKENS = 3000; // conservative — leaves room for system prompt + response
-const MAX_MESSAGES = MAX_TOKENS/300;
+const MAX_TOKENS = 9000;
+const MAX_MESSAGES = MAX_TOKENS / 300;
 
 function estimateTokens(text: string): number {
   return Math.ceil(text.length / 4);
 }
 
-// ── Strip reasoning blocks from model output ──────────────────────────────────
+// ── Strip reasoning/tool blocks from model output ─────────────────────────────
 function stripThinkingBlocks(text: string): string {
   // Remove fully closed <think>...</think> blocks
   let result = text
     .replace(/<think>[\s\S]*?<\/think>/gi, "")
     .replace(/<thinking>[\s\S]*?<\/thinking>/gi, "");
 
-  // For unclosed <think> — just remove the opening tag, keep the content after it
+  // For unclosed <think> — just remove the opening tag, keep content after it
   result = result.replace(/<think>/gi, "").replace(/<thinking>/gi, "");
+
+  // Salvage <tool_call> blocks that contain a shell command in <arg_value>
+  // e.g. <tool_call>run-shell\n<arg_key>command</arg_key>\n<arg_value>ls -la</arg_value>\n</tool_call>
+  result = result.replace(
+    /<tool_call>[\s\S]*?<arg_value>([\s\S]*?)<\/arg_value>[\s\S]*?<\/tool_call>/gi,
+    (_, cmd) => `<run-shell>${cmd.trim()}</run-shell>`
+  );
+
+  // Salvage unclosed tool_call with arg_value but no closing tool_call tag
+  result = result.replace(
+    /<tool_call>[\s\S]*?<arg_value>([\s\S]*?)<\/arg_value>/gi,
+    (_, cmd) => `<run-shell>${cmd.trim()}</run-shell>`
+  );
+
+  // Strip any remaining tool_call / function_call blocks entirely
+  result = result
+    .replace(/<tool_call>[\s\S]*?<\/tool_call>/gi, "")
+    .replace(/<function_call>[\s\S]*?<\/function_call>/gi, "")
+    .replace(/<arg_key>[\s\S]*?<\/arg_key>/gi, "")
+    .replace(/<arg_value>[\s\S]*?<\/arg_value>/gi, "");
 
   return result.trim();
 }
@@ -44,14 +63,12 @@ export class ChatManager {
   }
 
   getHistory(systemMsg: ChatMessage, userMsg: ChatMessage): ChatMessage[] {
-    // Truncate system prompt if enormous (e.g. large file context)
-    const safeSystemMsg = truncateMessage(systemMsg, MAX_TOKENS/2);
-    // Truncate user message if enormous (e.g. large results feed-back)
-    const safeUserMsg = truncateMessage(userMsg, MAX_TOKENS/2);
+    const safeSystemMsg = truncateMessage(systemMsg, MAX_TOKENS / 2);
+    const safeUserMsg = truncateMessage(userMsg, MAX_TOKENS / 2);
 
     const systemTokens = estimateTokens(safeSystemMsg.content);
     const userTokens = estimateTokens(safeUserMsg.content);
-    const reservedForResponse = MAX_TOKENS/3;
+    const reservedForResponse = MAX_TOKENS / 3;
     let remainingTokens = MAX_TOKENS - systemTokens - userTokens - reservedForResponse;
 
     const trimmed: ChatMessage[] = [];
@@ -65,7 +82,6 @@ export class ChatManager {
       remainingTokens -= tokens;
     }
 
-    // Ensure history starts with a user message
     while (trimmed.length > 0 && trimmed[0].role !== "user") {
       trimmed.shift();
     }
@@ -81,6 +97,7 @@ export class ChatManager {
   ): Promise<string> {
     const messages = this.getHistory(systemMsg, userMsg);
     const rawReply = await client.chat(messages, options);
+    console.log("raw reply:", rawReply);
     const reply = stripThinkingBlocks(rawReply);
 
     this.history.push(userMsg);
