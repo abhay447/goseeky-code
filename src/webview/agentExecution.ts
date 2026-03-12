@@ -124,9 +124,7 @@ export function parseAgentResponse(raw: string): AgentResponse {
 
 // ── Execute all sub-goals, collect results ────────────────────────────────────
 async function executeSubGoals(
-    subGoals: SubGoal[],
-    webviewView: vscode.WebviewView
-): Promise<CommandResult[]> {
+subGoals: SubGoal[], webviewView: vscode.WebviewView, alreadyRun: string[]): Promise<CommandResult[]> {
     const results: CommandResult[] = [];
 
     for (const sg of subGoals) {
@@ -140,11 +138,16 @@ async function executeSubGoals(
 
         for (const command of sg.commands) {
             if (stopRequested) { return results; }
+            if(alreadyRun.includes(command)){
+                console.log("command already tried" + command)
+                continue
+            }
 
             webviewView.webview.postMessage({ type: "shellRunning", command });
 
             try {
                 const { stdout, stderr } = await runShell(command);
+                console.log("command outputs" + command + " || " + stdout + " || " + stderr)
                 results.push({ command, stdout: stdout || "(no output)", stderr: stderr || "" });
                 webviewView.webview.postMessage({
                     type: "shellResult",
@@ -223,10 +226,11 @@ export async function runAgenticLoop(
         const attemptsLeft = MAX_ITERATIONS - iteration;
 
         const alreadyRun = accumulatedResults.map(r => r.command);
+        console.log("alreadyRun" + alreadyRun);
         const userMessage = accumulatedResults.length === 0
             ? userText
             : `Original goal: ${userText}\n\nCommands already executed (DO NOT repeat these):\n${alreadyRun.map(c => `- ${c}`).join("\n")}\n\nResults:\n${formatResultsForAI(accumulatedResults)}\n\nAttempts remaining: ${attemptsLeft}. Continue with NEW commands only. If the goal is achieved or cannot be achieved, set status to FINISHED or ABORTED.`;
-
+        console.log(userMessage)
         let reply: string;
         try {
             reply = await chatManager.chat(
@@ -320,7 +324,7 @@ export async function runAgenticLoop(
             }
             lastCommandSignature = currentSignature;
 
-            const newResults = await executeSubGoals(parsed.subGoals, webviewView);
+            const newResults = await executeSubGoals(parsed.subGoals, webviewView, alreadyRun);
             // Track all executed commands
             parsed.subGoals.flatMap(sg => sg.commands).forEach(cmd => executedCommands.add(cmd.trim()));
             accumulatedResults = [...accumulatedResults, ...newResults]; // append, not replace

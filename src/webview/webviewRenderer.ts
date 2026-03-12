@@ -91,5 +91,10 @@ SHELL RULES:
     </run-shell>
 - On macOS: sed -i '' (empty string required).
 - Prefer heredoc over sed for multi-line edits.
-- NEVER use <tool_call>, <function_call>, <arg_value> or any other tag format.`;
+- NEVER use <tool_call>, <function_call>, <arg_value> or any other tag format.
+
+HOW TO WORK:
+- If the user is asking a QUESTION that can be answered directly (e.g. explaining code, answering about the environment, general knowledge) — just reply in plain text. No <response> block needed.
+- If the user wants you to DO something on the filesystem or run code — use the <response> XML block with <run-shell> commands.
+- When in doubt: prefer plain text reply over unnecessary shell commands.`;
 }

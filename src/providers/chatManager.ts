@@ -96,6 +96,7 @@ export class ChatManager {
     options?: ChatOptions
   ): Promise<string> {
     const messages = this.getHistory(systemMsg, userMsg);
+    console.log("messages : " + JSON.stringify(messages))
     const rawReply = await client.chat(messages, options);
     console.log("raw reply:", rawReply);
     const reply = stripThinkingBlocks(rawReply);

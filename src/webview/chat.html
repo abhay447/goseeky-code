@@ -251,6 +251,15 @@
             if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
         });
 
+        function hashCommand(str) {
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {
+                hash = ((hash << 5) - hash) + str.charCodeAt(i);
+                hash |= 0; // convert to 32bit int
+            }
+            return Math.abs(hash).toString(36);
+        }
+
         // ── Send ──────────────────────────────────────────────────────────
         function send() {
             const text = inputEl.value.trim();
@@ -351,13 +360,13 @@
             if (msg.type === 'shellRunning') {
                 const card = document.createElement('div');
                 card.className = 'card running';
-                card.id = 'running-' + btoa(msg.command).slice(0, 12);
+                card.id = 'running-' + hashCommand(msg.command).slice(0, 12);
                 card.innerHTML = '<div class="card-title">⏳ Running</div><pre>' + escapeHtml(msg.command) + '</pre>';
                 appendToIteration(card);
             }
 
             if (msg.type === 'shellResult') {
-                const runningId = 'running-' + btoa(msg.command).slice(0, 12);
+                const runningId = 'running-' + hashCommand(msg.command).slice(0, 12);
                 const runningCard = document.getElementById(runningId);
 
                 const card = document.createElement('div');
