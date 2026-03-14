@@ -51,9 +51,10 @@ function truncateMessage(msg: ChatMessage, maxTokens: number): ChatMessage {
 
 export class ChatManager {
   private history: ChatMessage[] = [];
-  private readonly storageKey = "goseeky.chatHistory";
+  private storageKey: string;
 
-  constructor(private context: vscode.ExtensionContext) {
+  constructor(private context: vscode.ExtensionContext, private historyKey: string = "goseeky.chatHistory") {
+    this.storageKey = historyKey;
     this.history = this.context.globalState.get<ChatMessage[]>(this.storageKey, []);
   }
 
