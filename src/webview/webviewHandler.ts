@@ -1,8 +1,20 @@
 import * as vscode from "vscode";
 import { ChatManager } from "../providers";
-import { AgentState, applyEdit, createFile, runShell, runAgenticLoop, switchProvider, requestStop } from "./agentExecution";
+import { AgentState, applyEdit, createFile, switchProvider, requestStop } from "./agentExecution";
+import { TeamLeadAgent } from "../agents/teamlead";
+import { runShell } from "../utils/shellUtils";
 
 export { AgentState };
+
+// Module-level agent instance — persists across messages to maintain conversation state
+let teamLeadAgent: TeamLeadAgent | null = null;
+
+function getAgent(): TeamLeadAgent {
+    if (!teamLeadAgent) {
+        teamLeadAgent = new TeamLeadAgent();
+    }
+    return teamLeadAgent;
+}
 
 export async function handleAgentMessage(
     state: AgentState,
@@ -21,9 +33,7 @@ export async function handleAgentMessage(
             webviewView.webview.postMessage({ type: "error", text: "No API key set. Run 'Goseeky: Set API Key'." });
             return;
         }
-        const config = vscode.workspace.getConfiguration("goseeky-code");
-        const temperature = config.get<number>("temperature", 0.0);
-        await runAgenticLoop(state, chatManager, msg.text, temperature, webviewView);
+        await getAgent().runAgenticLoop(state.activeProvider, msg.text, context, webviewView);
     }
 
     if (msg.type === "stopAgent") {
@@ -70,7 +80,9 @@ export async function handleAgentMessage(
     }
 
     if (msg.type === "clearHistory") {
+        // Clear both the passed-in chatManager and the agent's internal history
         chatManager.clear();
+        getAgent().clearHistory();
         webviewView.webview.postMessage({ type: "historyCleared" });
     }
 }
