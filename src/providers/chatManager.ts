@@ -100,6 +100,9 @@ export class ChatManager {
     console.log("messages : " + JSON.stringify(messages))
     const rawReply = await client.chat(messages, options);
     console.log("raw reply:", rawReply);
+    if (!rawReply) {
+      throw new Error("Empty response from API");
+    }
     const reply = stripThinkingBlocks(rawReply);
 
     this.history.push(userMsg);
