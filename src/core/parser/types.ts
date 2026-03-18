@@ -40,7 +40,6 @@ export interface Edge {
 }
 
 export interface LanguageExtractor {
-  language: any;
   extensions: string[];
 
   extract(code: string, filePath: string): ParseResult;

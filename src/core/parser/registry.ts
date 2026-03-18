@@ -1,3 +1,5 @@
+import { PythonExtractor } from "./languages/python/extractor";
+import { TypeScriptExtractor } from "./languages/typescript/extractor";
 import { LanguageExtractor } from "./types";
 
 const registry = new Map<string, LanguageExtractor>();
@@ -22,3 +24,6 @@ function getFileExtension(filePath: string): string {
   if (idx === -1) return "";
   return filePath.slice(idx);
 }
+
+registerLanguage(new TypeScriptExtractor())
+registerLanguage(new PythonExtractor())

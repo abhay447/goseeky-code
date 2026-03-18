@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import { TypeScriptExtractor } from "../core/parser/languages/typescript/extractor";
 import { PythonExtractor } from "../core/parser/languages/python/extractor";
+import { walkDir } from "../core/parser/filewalker";
 
 // --- CONFIG ---
 const LANGUAGE = process.argv[2]; // pass file OR fallback
@@ -15,31 +16,32 @@ function run() {
     filePath = path.resolve(TEST_FILE);
     code = fs.readFileSync(filePath, "utf-8");
 
+  console.log(walkDir("/Users/rishikamishra/work/sarvam_poc/sarvam-code/"));
 
-  const extractor = LANGUAGE.toUpperCase().startsWith("PYTHON") ? new PythonExtractor() : new TypeScriptExtractor();
+  // const extractor = LANGUAGE.toUpperCase().startsWith("PYTHON") ? new PythonExtractor() : new TypeScriptExtractor();
 
-  console.log("🚀 Running TypeScript Extractor...\n");
+  // console.log("🚀 Running TypeScript Extractor...\n");
 
-  const result = extractor.extract(code, filePath);
+  // const result = extractor.extract(code, filePath);
 
-  console.log(`📦 Entities Found: ${result.entities.length}\n`);
+  // console.log(`📦 Entities Found: ${result.entities.length}\n`);
 
-  for (const entity of result.entities) {
-    console.log(
-      `[${entity.type.toUpperCase()}] ${entity.name}\n` +
-      `  📍 ${entity.filePath}:${entity.startLine}-${entity.endLine}\n`
-    );
-  }
+  // for (const entity of result.entities) {
+  //   console.log(
+  //     `[${entity.type.toUpperCase()}] ${entity.name}\n` +
+  //     `  📍 ${entity.filePath}:${entity.startLine}-${entity.endLine}\n`
+  //   );
+  // }
 
-  if (result.edges.length > 0) {
-    console.log(`\n🔗 Edges Found: ${result.edges.length}\n`);
+  // if (result.edges.length > 0) {
+  //   console.log(`\n🔗 Edges Found: ${result.edges.length}\n`);
 
-    for (const edge of result.edges) {
-      console.log(`${edge.from} --${edge.type}--> ${edge.to}`);
-    }
-  } else {
-    console.log("\n(no edges yet)");
-  }
+  //   for (const edge of result.edges) {
+  //     console.log(`${edge.from} --${edge.type}--> ${edge.to}`);
+  //   }
+  // } else {
+  //   console.log("\n(no edges yet)");
+  // }
 }
 
 run();
