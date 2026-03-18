@@ -34,8 +34,8 @@ export class PythonExtractor {
                         name: className,
                         type: "class",
                         filePath,
-                        startLine: node.startPosition.row,
-                        endLine: node.endPosition.row,
+                        startIndex: node.startIndex,
+                        endIndex: node.endIndex,
                     });
 
                     node.children.forEach((child: any) =>
@@ -63,8 +63,8 @@ export class PythonExtractor {
                         name: fullName,
                         type: currentClass ? "method" : "function",
                         filePath,
-                        startLine: node.startPosition.row,
-                        endLine: node.endPosition.row,
+                        startIndex: node.startIndex,
+                        endIndex: node.endIndex,
                     });
 
                     node.children.forEach((child: any) =>
@@ -96,8 +96,8 @@ export class PythonExtractor {
                             name,
                             type: "constant",
                             filePath,
-                            startLine: node.startPosition.row,
-                            endLine: node.endPosition.row,
+                        startIndex: node.startIndex,
+                        endIndex: node.endIndex,
                         });
                     }
                 }

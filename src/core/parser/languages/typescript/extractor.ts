@@ -34,8 +34,8 @@ export class TypeScriptExtractor {
                         name: className,
                         type: "class",
                         filePath,
-                        startLine: node.startPosition.row,
-                        endLine: node.endPosition.row,
+                        startIndex: node.startIndex,
+                        endIndex: node.endIndex,
                     });
 
                     node.children.forEach((child: any) =>
@@ -62,8 +62,8 @@ export class TypeScriptExtractor {
                         name: fullName,
                         type: "method",
                         filePath,
-                        startLine: node.startPosition.row,
-                        endLine: node.endPosition.row,
+                        startIndex: node.startIndex,
+                        endIndex: node.endIndex,
                     });
 
                     node.children.forEach((child: any) =>
@@ -87,8 +87,8 @@ export class TypeScriptExtractor {
                         name: fnName,
                         type: "function",
                         filePath,
-                        startLine: node.startPosition.row,
-                        endLine: node.endPosition.row,
+                        startIndex: node.startIndex,
+                        endIndex: node.endIndex,
                     });
 
                     node.children.forEach((child: any) =>
@@ -119,8 +119,8 @@ export class TypeScriptExtractor {
                             name: fullName,
                             type: "function",
                             filePath,
-                            startLine: node.startPosition.row,
-                            endLine: node.endPosition.row,
+                        startIndex: node.startIndex,
+                        endIndex: node.endIndex,
                         });
 
                         node.children.forEach((child: any) =>
@@ -142,8 +142,8 @@ export class TypeScriptExtractor {
                             name,
                             type: "constant",
                             filePath,
-                            startLine: node.startPosition.row,
-                            endLine: node.endPosition.row,
+                        startIndex: node.startIndex,
+                        endIndex: node.endIndex,
                         });
                     }
                 }
