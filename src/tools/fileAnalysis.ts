@@ -9,30 +9,30 @@ import * as fs from 'fs';
  * end is inclusive in fs.createReadStream.
  */
 function readCharRange(filePath: string, start: number, end: number): Promise<string> {
-    return new Promise((resolve, reject) => {
-        if (!fs.existsSync(filePath)) {
-            return reject(new Error(`File not found: ${filePath}`));
-        }
+  return new Promise((resolve, reject) => {
+    if (!fs.existsSync(filePath)) {
+      return reject(new Error(`File not found: ${filePath}`));
+    }
 
-        const stream = fs.createReadStream(filePath, {
-            encoding: 'utf8',
-            start: start,
-            end: end
-        });
-
-        let data = '';
-        stream.on('data', chunk => data += (chunk as string));
-        stream.on('end', () => resolve(data));
-        stream.on('error', err => reject(err));
+    const stream = fs.createReadStream(filePath, { 
+      encoding: 'utf8', 
+      start: start, 
+      end: end 
     });
+
+    let data = '';
+    stream.on('data', chunk => data += (chunk as string));
+    stream.on('end', () => resolve(data));
+    stream.on('error', err => reject(err));
+  });
 }
 
 // ── Prompts ───────────────────────────────────────────────────────────────────
 
 export async function buildFileAnalysisPrompt(
-    maxChars: number = 1000,
-    overlapWindow: number = 200,
-    chunkIndex: number = 0,
+    maxChars: number = 1000, 
+    overlapWindow: number = 200, 
+    chunkIndex: number = 0, 
     filePath: string
 ) {
     // Calculate the window based on chunkIndex
