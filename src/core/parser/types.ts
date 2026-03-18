@@ -14,11 +14,12 @@ export interface Entity {
   name: string;
   type: EntityType;
   filePath: string;
-  startIndex: number;
-  endIndex: number;
+  startIndex?: number;
+  endIndex?: number;
   signature?: string;
   docstring?: string;
   dependencies?: string[];
+  code?: string;
 }
 
 export interface ParseResult {

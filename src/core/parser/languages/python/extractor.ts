@@ -3,6 +3,7 @@ import Python from "tree-sitter-python";
 import crypto from "crypto";
 import { ASTParser } from "../../treeparser";
 import { Entity, ParseResult, Edge } from "../../types";
+import {extractCodeSnippet} from "../../utils";
 
 export class PythonExtractor {
     extensions = [".py"];
@@ -36,6 +37,7 @@ export class PythonExtractor {
                         filePath,
                         startIndex: node.startIndex,
                         endIndex: node.endIndex,
+                        code : extractCodeSnippet(code,node.startIndex,node.endIndex)
                     });
 
                     node.children.forEach((child: any) =>
@@ -65,6 +67,7 @@ export class PythonExtractor {
                         filePath,
                         startIndex: node.startIndex,
                         endIndex: node.endIndex,
+                        code : extractCodeSnippet(code,node.startIndex,node.endIndex)
                     });
 
                     node.children.forEach((child: any) =>
@@ -98,6 +101,7 @@ export class PythonExtractor {
                             filePath,
                         startIndex: node.startIndex,
                         endIndex: node.endIndex,
+                        code : extractCodeSnippet(code,node.startIndex,node.endIndex)
                         });
                     }
                 }

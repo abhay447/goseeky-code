@@ -3,6 +3,7 @@ import JavaScript from "tree-sitter-javascript";
 import crypto from "crypto";
 import { ASTParser } from "../../treeparser";
 import { Entity, ParseResult, Edge } from "../../types";
+import {extractCodeSnippet} from "../../utils";
 
 export class TypeScriptExtractor {
     extensions = [".ts", ".js"];
@@ -36,6 +37,7 @@ export class TypeScriptExtractor {
                         filePath,
                         startIndex: node.startIndex,
                         endIndex: node.endIndex,
+                        code : extractCodeSnippet(code,node.startIndex,node.endIndex)
                     });
 
                     node.children.forEach((child: any) =>
@@ -64,6 +66,7 @@ export class TypeScriptExtractor {
                         filePath,
                         startIndex: node.startIndex,
                         endIndex: node.endIndex,
+                        code : extractCodeSnippet(code,node.startIndex,node.endIndex)
                     });
 
                     node.children.forEach((child: any) =>
@@ -89,6 +92,7 @@ export class TypeScriptExtractor {
                         filePath,
                         startIndex: node.startIndex,
                         endIndex: node.endIndex,
+                        code : extractCodeSnippet(code,node.startIndex,node.endIndex)
                     });
 
                     node.children.forEach((child: any) =>
@@ -121,6 +125,7 @@ export class TypeScriptExtractor {
                             filePath,
                         startIndex: node.startIndex,
                         endIndex: node.endIndex,
+                        code : extractCodeSnippet(code,node.startIndex,node.endIndex)
                         });
 
                         node.children.forEach((child: any) =>
@@ -144,6 +149,7 @@ export class TypeScriptExtractor {
                             filePath,
                         startIndex: node.startIndex,
                         endIndex: node.endIndex,
+                        code : extractCodeSnippet(code,node.startIndex,node.endIndex)
                         });
                     }
                 }
