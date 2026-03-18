@@ -1,40 +1,58 @@
 import fs from "fs";
-import path from "path";
-import { TypeScriptExtractor } from "../core/parser/languages/typescript/extractor";
-import { PythonExtractor } from "../core/parser/languages/python/extractor";
 import { walkDir } from "../core/parser/filewalker";
 import { getExtractorForFile } from "../core/parser/registry";
 import { buildEmbeddingDocs } from "../core/embeddings/buildDocs";
-import { embed } from "../core/embeddings/embedder";
+import { embed, embedBatch, initEmbedder } from "../core/embeddings/embedder";
+import { HNSWVectorStore } from "../core/search/hnswStore";
+import { GraphStore } from "../core/search/graphStore";
+import { hybridSearch } from "../core/search/hybridSearch";
+import { Entity } from "../core/parser/types";
 
-// --- CONFIG ---
-// const LANGUAGE = process.argv[2]; // pass file OR fallback
-// const TEST_FILE = process.argv[3]; // pass file OR fallback
-const SCAN_PATH = process.argv[2]; // pass file OR fallback
+const SCAN_PATH = process.argv[2];
 
+const vectorStore = new HNSWVectorStore(384); // MiniLM dim
+const graphStore = new GraphStore();
+const entityDb = new Map<String, Entity>();
 
+// -----------------------------
+// Process one file
+// -----------------------------
 async function processFile(filePath: string) {
   const extractor = getExtractorForFile(filePath);
-  if (!extractor) return;
+  if (!extractor) return null;
 
   const code = fs.readFileSync(filePath, "utf-8");
 
   const result = extractor.extract(code, filePath);
+  for(let entity of  result.entities) {
+    entityDb.set(entity.id, entity);
+  }
 
-  // 👉 Build embedding docs
   const docs = buildEmbeddingDocs(result.entities, result.edges);
 
-  // 👉 Generate embeddings
-  const embeddings = await Promise.all(
-    docs.map(async (doc) => ({
-      id: doc.id,
-      vector: await embed(doc.content),
-      content: doc.content,
+  graphStore.addEdges(result.edges);
+
+  if (docs.length === 0) {
+    return null;
+  }
+
+  // ✅ BATCH embedding
+  const vectors = await embedBatch(docs.map(d => d.content));
+
+  const embeddings = docs.map((doc, i) => ({
+    id: doc.id,
+    vector: vectors[i],
+    content: doc.content,
+  }));
+
+  vectorStore.addMany(
+    embeddings.map(e => ({
+      id: e.id,
+      vector: e.vector,
     }))
   );
 
-  // 👉 store (for now just log)
-  console.log("EMBEDDED:", embeddings.length);
+  console.log(`EMBEDDED: ${embeddings.length} (${filePath})`);
 
   return {
     entities: result.entities,
@@ -43,43 +61,42 @@ async function processFile(filePath: string) {
   };
 }
 
-// --- Runner ---
-function run() {
-  let code: string;
-  let filePath: string;
-
-    // filePath = path.resolve(TEST_FILE);
-    // code = fs.readFileSync(filePath, "utf-8");
-
-  for(let file of walkDir(SCAN_PATH)) {
-    console.log(file);
-    processFile(file);
+// -----------------------------
+// Runner with concurrency control
+// -----------------------------
+async function run() {
+  if (!SCAN_PATH) {
+    console.error("❌ Provide path");
+    process.exit(1);
   }
 
-  // const extractor = LANGUAGE.toUpperCase().startsWith("PYTHON") ? new PythonExtractor() : new TypeScriptExtractor();
+  // ✅ init model once
+  await initEmbedder();
 
-  // console.log("🚀 Running TypeScript Extractor...\n");
+  const files = walkDir(SCAN_PATH);
 
-  // const result = extractor.extract(code, filePath);
+  console.log(`📂 Found ${files.length} files\n`);
 
-  // console.log(`📦 Entities Found: ${result.entities.length}\n`);
+  const CONCURRENCY = 4; // tweak (4–8 ideal)
 
-  // for (const entity of result.entities) {
-  //   console.log(
-  //     `[${entity.type.toUpperCase()}] ${entity.name}\n` +
-  //     `  📍 ${entity.filePath}:${entity.startLine}-${entity.endLine}\n`
-  //   );
-  // }
+  for (let i = 0; i < files.length; i += CONCURRENCY) {
+    const batch = files.slice(i, i + CONCURRENCY);
 
-  // if (result.edges.length > 0) {
-  //   console.log(`\n🔗 Edges Found: ${result.edges.length}\n`);
+    await Promise.all(batch.map(file => processFile(file)));
+  }
 
-  //   for (const edge of result.edges) {
-  //     console.log(`${edge.from} --${edge.type}--> ${edge.to}`);
-  //   }
-  // } else {
-  //   console.log("\n(no edges yet)");
-  // }
+  console.log("\n✅ Done");
+
+  // const queryVec = await embed("eval prompt definition");
+
+  const results = await hybridSearch("eval prompt definition", vectorStore, graphStore);
+
+  for(let entry of results){
+    console.log(entry)
+    console.log(entityDb.get(entry.id!))
+  }
+
+  console.log(results);
 }
 
 run();

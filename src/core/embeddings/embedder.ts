@@ -24,3 +24,14 @@ export async function embed(text: string): Promise<number[]> {
 
   return Array.from(output.data);
 }
+
+export async function embedBatch(texts: string[]) {
+  if (!embedder) await initEmbedder();
+
+  const output = await embedder(texts, {
+    pooling: "mean",
+    normalize: true,
+  });
+
+  return output.tolist(); // array of vectors
+}
