@@ -1,7 +1,7 @@
 import Parser from "tree-sitter";
 import Python from "tree-sitter-python";
 import crypto from "crypto";
-import { ASTParser } from "../../treeparser";
+import { ASTParser, Language } from "../../treeparser";
 import { Entity, ParseResult, Edge } from "../../types";
 import {extractCodeSnippet} from "../../utils";
 
@@ -9,7 +9,7 @@ export class PythonExtractor {
     extensions = [".py"];
 
     extract(code: string, filePath: string): ParseResult {
-        const parser = new ASTParser(Python as unknown as Parser.Language);
+        const parser = new ASTParser(Python as unknown as Language);
         const tree = parser.parse(code);
 
         const entities: Entity[] = [];

@@ -17,4 +17,8 @@ export class GraphStore {
   getNeighbors(id: string) {
     return this.adjacency.get(id) || [];
   }
+
+  listEntities() {
+    return this.adjacency.keys();
+  }
 }

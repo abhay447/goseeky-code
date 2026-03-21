@@ -1,15 +1,17 @@
 import Parser from "tree-sitter";
-import JavaScript from "tree-sitter-javascript";
+import TypeScript = require("tree-sitter-typescript");
 import crypto from "crypto";
-import { ASTParser } from "../../treeparser";
+import { ASTParser, Language } from "../../treeparser";
 import { Entity, ParseResult, Edge } from "../../types";
-import {extractCodeSnippet} from "../../utils";
+import { extractCodeSnippet } from "../../utils";
+
+const { typescript, tsx } = TypeScript;
 
 export class TypeScriptExtractor {
-    extensions = [".ts", ".js"];
+    extensions = [".ts"];
 
     extract(code: string, filePath: string): ParseResult {
-        const parser = new ASTParser(JavaScript as unknown as Parser.Language);
+        const parser = new ASTParser(typescript as unknown as Language);
         const tree = parser.parse(code);
 
         const entities: Entity[] = [];
@@ -21,6 +23,18 @@ export class TypeScriptExtractor {
             currentClass?: string,
             currentFunction?: string
         ) {
+
+            // =========================
+            // EXPORT WRAPPER FIX 🔥
+            // =========================
+            if (node.type === "export_statement") {
+                const decl = node.childForFieldName("declaration");
+
+                if (decl) {
+                    walk(decl, currentClass, currentFunction);
+                    return;
+                }
+            }
             // =========================
             // CLASS
             // =========================
@@ -37,7 +51,7 @@ export class TypeScriptExtractor {
                         filePath,
                         startIndex: node.startIndex,
                         endIndex: node.endIndex,
-                        code : extractCodeSnippet(code,node.startIndex,node.endIndex)
+                        code: extractCodeSnippet(code, node.startIndex, node.endIndex)
                     });
 
                     node.children.forEach((child: any) =>
@@ -66,7 +80,7 @@ export class TypeScriptExtractor {
                         filePath,
                         startIndex: node.startIndex,
                         endIndex: node.endIndex,
-                        code : extractCodeSnippet(code,node.startIndex,node.endIndex)
+                        code: extractCodeSnippet(code, node.startIndex, node.endIndex)
                     });
 
                     node.children.forEach((child: any) =>
@@ -92,7 +106,7 @@ export class TypeScriptExtractor {
                         filePath,
                         startIndex: node.startIndex,
                         endIndex: node.endIndex,
-                        code : extractCodeSnippet(code,node.startIndex,node.endIndex)
+                        code: extractCodeSnippet(code, node.startIndex, node.endIndex)
                     });
 
                     node.children.forEach((child: any) =>
@@ -123,9 +137,9 @@ export class TypeScriptExtractor {
                             name: fullName,
                             type: "function",
                             filePath,
-                        startIndex: node.startIndex,
-                        endIndex: node.endIndex,
-                        code : extractCodeSnippet(code,node.startIndex,node.endIndex)
+                            startIndex: node.startIndex,
+                            endIndex: node.endIndex,
+                            code: extractCodeSnippet(code, node.startIndex, node.endIndex)
                         });
 
                         node.children.forEach((child: any) =>
@@ -147,9 +161,9 @@ export class TypeScriptExtractor {
                             name,
                             type: "constant",
                             filePath,
-                        startIndex: node.startIndex,
-                        endIndex: node.endIndex,
-                        code : extractCodeSnippet(code,node.startIndex,node.endIndex)
+                            startIndex: node.startIndex,
+                            endIndex: node.endIndex,
+                            code: extractCodeSnippet(code, node.startIndex, node.endIndex)
                         });
                     }
                 }

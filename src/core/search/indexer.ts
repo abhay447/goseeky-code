@@ -38,10 +38,7 @@ async function processFile(filePath: string, hybridStore: HybridStore) {
     }));
 
     hybridStore.putEmbeddings(
-        embeddings.map(e => ({
-            id: e.id,
-            vector: e.vector,
-        }))
+        embeddings
     );
 
     console.log(`EMBEDDED: ${embeddings.length} (${filePath})`);
@@ -80,5 +77,6 @@ export async function indexRepo(repoRoot?: string) {
 
         await Promise.all(batch.map(file => processFile(file, hybridStore)));
     }
+    hybridStore.finalize();
     return hybridStore;
 }

@@ -1,10 +1,15 @@
 // src/core/parser.ts
-import Parser from "tree-sitter";
+import Parser = require("tree-sitter");
+
+export type Language = {
+  name: string;
+  version: number;
+};
 
 export class ASTParser {
   private parser: Parser;
 
-  constructor(language: Parser.Language) {
+  constructor(language: Language) {
     this.parser = new Parser();
     this.parser.setLanguage(language);
   }
