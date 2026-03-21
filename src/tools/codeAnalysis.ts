@@ -1,10 +1,4 @@
-import * as vscode from "vscode";
-import * as os from 'os';
-import * as process from 'process';
-import { runShell } from "../utils/shellUtils";
-import * as fs from 'fs';
 import { HybridStore } from "../core/search/hybridStore";
-import { Entity } from "../core/parser/types";
 import { extractCodeSnippetFromFile } from "../core/parser/utils";
 import { AgentTool } from "./types";
 
@@ -12,7 +6,7 @@ import { AgentTool } from "./types";
 export class RepoSearch implements AgentTool {
   private hybridStore: HybridStore
   name: string = 'RepoSearchTool'
-  toolDescription: string = `This tools allows the agent to search the repo for a query string and returns matching entities. Arguments {"query" : <string_to_search>}`
+  toolDescription: string = `This tools allows the agent to search the repo for a query string and returns matching source code entities. Arguments {"query" : <string_to_search>}`
   constructor(hybridStore: HybridStore) {
     this.hybridStore = hybridStore;
   }
