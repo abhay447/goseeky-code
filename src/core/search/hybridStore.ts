@@ -198,4 +198,8 @@ export class HybridStore {
             .slice(0, topK);
     }
 
+    async getEntity(entityId : string): Promise<Entity>{
+        return this.entityDb.get(entityId)!;
+    }  
+
 }
