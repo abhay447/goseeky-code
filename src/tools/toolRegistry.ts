@@ -25,29 +25,22 @@ export class ToolRegistry {
 
     listToolsPrompt() {
         `
-        Your job is to:
-            1. look at the available tools and current goal/sub goal .
-            2. Pick the correct tool and correct args which help us solve the goal/sub goal.
+        Here is the tools list:
+            ${JSON.stringify(this.toolsList)}
         Respond in the following format:
             {
                 "tool" : <tool_name>,
                 "arguments" : {ARGUMENTS_JSON_AS_PER_TOOL_DETAILS}
             }
-        Here is the tools list:
-            ${JSON.stringify(this.toolsList)}
-        DO NOT RESPOND WITH ANYTHING OTHER THAN JSON.
         `
     }
 
-    executeTool(toolsJson : string){
-        let invocationJSON = JSON.parse(toolsJson)
-        let toolName = invocationJSON['tool']
-        if(!toolName || !this.toolsMap.has(toolName)){
+    executeTool(toolName: string, args: string){
+        if(!this.toolsMap.has(toolName)){
             throw `Invalid tool name selected : ${toolName}`
         }
-        let tool = this.toolsMap.get(invocationJSON['tool'])!;
-        let args = invocationJSON["arguments"]!;
-        return tool.execute(JSON.stringify(args));
+        let tool = this.toolsMap.get(toolName)!;
+        return tool.execute(args);
     }
 
 

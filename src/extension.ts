@@ -3,6 +3,8 @@ import * as fs from "fs";
 import * as path from "path";
 import { AIProvider, SarvamProvider, GeminiProvider, ChatManager } from "./providers";
 import { AgentState, handleAgentMessage } from "./webview/webviewHandler";
+import { indexRepo } from "./core/search/indexer";
+import { ToolRegistry } from "./tools/toolRegistry";
 
 let lastActiveEditor: vscode.TextEditor | undefined;
 let chatManager: ChatManager;
@@ -12,7 +14,10 @@ const state: AgentState = {
 };
 
 export async function activate(context: vscode.ExtensionContext) {
-  console.log("Goseeky Code extension activated");
+  const repoRoot = vscode.workspace.workspaceFolders?.[0].uri.fsPath;
+  const hybridStore = await indexRepo(repoRoot);
+  const toolRegistry = new ToolRegistry(hybridStore)
+  console.log("Goseeky Code extension activated"); 
 
   // Load saved keys on startup — use whichever is available
   const sarvamKey = await context.secrets.get("goseeky.sarvam.apiKey");
@@ -43,6 +48,7 @@ export async function activate(context: vscode.ExtensionContext) {
         webviewView.webview.onDidReceiveMessage(async (msg) => await handleAgentMessage(
           state,
           chatManager,
+          toolRegistry,
           context,
           lastActiveEditor,
           webviewView,

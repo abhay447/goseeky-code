@@ -2,8 +2,9 @@ import * as vscode from "vscode";
 import * as os from 'os';
 import * as process from 'process';
 import { AIProvider, ChatManager } from "../providers";
-import { ShellAgent, AGENT_STATUS } from "./shellAgent";
+import { CodeAgent, AGENT_STATUS } from "./codeAgent";
 import { isStopped, resetStop } from "../webview/agentExecution";
+import { ToolRegistry } from "../tools/toolRegistry";
 
 // ── Shared env info ───────────────────────────────────────────────────────────
 export function getExtensionContextInfo(): string {
@@ -121,6 +122,7 @@ export class TeamLeadAgent {
     async runAgenticLoop(
         client: AIProvider,
         userQuery: string,
+        toolRegistry: ToolRegistry,
         context: vscode.ExtensionContext,
         webviewView: vscode.WebviewView
     ): Promise<string> {
@@ -131,7 +133,7 @@ export class TeamLeadAgent {
             this.teamLeadChatManager = new ChatManager(context, "teamlead_plan_agent");
         }
 
-        const shellSubAgent = new ShellAgent();
+        const shellSubAgent = new CodeAgent(toolRegistry);
         let currentQuery = userQuery;
         const goalCache = new Map<string, Goal>();
 

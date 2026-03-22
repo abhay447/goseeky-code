@@ -3,6 +3,7 @@ import { ChatManager } from "../providers";
 import { AgentState, applyEdit, createFile, switchProvider, requestStop } from "./agentExecution";
 import { TeamLeadAgent } from "../agents/teamlead";
 import { runShell } from "../utils/shellUtils";
+import { ToolRegistry } from "../tools/toolRegistry";
 
 export { AgentState };
 
@@ -19,6 +20,7 @@ function getAgent(): TeamLeadAgent {
 export async function handleAgentMessage(
     state: AgentState,
     chatManager: ChatManager,
+    toolRegistry: ToolRegistry,
     context: vscode.ExtensionContext,
     lastActiveEditor: vscode.TextEditor | undefined,
     webviewView: vscode.WebviewView,
@@ -33,7 +35,7 @@ export async function handleAgentMessage(
             webviewView.webview.postMessage({ type: "error", text: "No API key set. Run 'Goseeky: Set API Key'." });
             return;
         }
-        await getAgent().runAgenticLoop(state.activeProvider, msg.text, context, webviewView);
+        await getAgent().runAgenticLoop(state.activeProvider, msg.text, toolRegistry, context, webviewView);
     }
 
     if (msg.type === "stopAgent") {

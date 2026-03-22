@@ -3,6 +3,7 @@ import { AIProvider, ChatManager } from "../providers";
 import { isStopped } from "../webview/agentExecution";
 import { runShell } from "../utils/shellUtils";
 import { buildGoalEvaluationPrompt, getExtensionContextInfo } from "./teamlead";
+import { ToolRegistry } from "../tools/toolRegistry";
 
 export enum AGENT_STATUS {
     STATUS_SUCCESS = "STATUS_SUCCESS",
@@ -14,11 +15,16 @@ interface ExecutionResult {
     stderr: string;
 }
 
+interface Command {
+    tool: string
+    arguments: string
+}
+
 interface CommandContext {
     goal_id?: string;
     goal?: string;
     command?: string;
-    executionResult?: ExecutionResult;
+    executionResult?: string;
     response?: string;
     timestamp?: number;
     reviewComments?: string;
@@ -33,29 +39,31 @@ interface ReviewContext {
 const MAX_ITERATIONS = 8;
 const REVIEW_RESPONSE_SCORE_THRESHOLD = 3.5;
 
-export class ShellAgent {
-
+export class CodeAgent {
+    toolRegistry: ToolRegistry;
+    constructor(toolRegistry: ToolRegistry){
+        this.toolRegistry = toolRegistry;
+    }
     buildSystemPrompt(): string {
         const envInfo = getExtensionContextInfo();
         return `
-You are a File System agent which accepts user goals and tries to execute them using shell tool.
+You are a coding System agent which accepts user goals and tries to execute them tools at hand.
+Here is the list of accessible tools:
+${this.toolRegistry.listToolsPrompt()}
 Here is the basic info about the current shell execution environment.
 ${envInfo}
-
-If the goal_msg is a plain text response (not a file operation or data query),
-your command should simply be: echo "<the goal_msg text>".
 
 Based on the conversation history you need to respond with the following attributes:
 
 {
     "goal" : <goal from input>,
-    "response" : <empty if a command needs to be run>,
-    "command" : <shell command to run — ALWAYS provide a command, use echo for text-only responses>
+    "tool" : <tool_name>,
+    "arguments" : {ARGUMENTS_JSON_AS_PER_TOOL_DETAILS, should be stringified json as it will be reparsed}
 }
 
-IMPORTANT: You MUST always provide a non-empty "command". If the goal requires a text response,
-use: echo "<your response here>"
-Never leave "command" empty or null.
+IMPORTANT: You MUST always provide a non-empty "tool" and "arguments". If the goal requires a text response,
+use: tool=ShellExecute arguments='echo "<msg to user>" .
+Never leave "tool" and "arguments"  empty or null.
 
 Your conversation history will occasionally also contain inputs from your team lead who has analysed your previous attempts, use that to steer approach in right direction.
 DO NOT REPLY ANYTHING other than JSON.
@@ -67,7 +75,7 @@ DO NOT REPLY ANYTHING other than JSON.
             const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
             return JSON.parse(cleaned);
         } catch (e) {
-            console.error(`[ShellAgent] Failed to parse ${label} JSON:`, raw);
+            console.error(`[CodeAgent] Failed to parse ${label} JSON:`, raw);
             return null;
         }
     }
@@ -81,7 +89,7 @@ DO NOT REPLY ANYTHING other than JSON.
     ): Promise<CommandContext> {
         let currentGoal = userGoal;
         const commandRunHistory: CommandContext[] = [];
-        const subAgentChatManager = new ChatManager(context, `shell_agent.${goalId}`);
+        const subAgentChatManager = new ChatManager(context, `code_agent.${goalId}`);
         const teamLeadChatManager = new ChatManager(context, `teamlead_eval.${goalId}`);
         subAgentChatManager.clear();
         teamLeadChatManager.clear();
@@ -137,28 +145,32 @@ DO NOT REPLY ANYTHING other than JSON.
             }
 
             const response: string = parsedMsg["response"] ?? "";
-            const command: string = (parsedMsg["command"] ?? "").trim();
+            const tool: string = (parsedMsg["tool"] ?? "").trim();
+            const args: string = (parsedMsg["arguments"] ?? "").trim();
+            const command = {"tool": tool, "arguments": args}
 
-            if (!command) {
+            if (!tool) {
                 // Model disobeyed — if there's a response text, echo it as fallback
-                const fallbackCommand = response
-                    ? `echo "${response.replace(/"/g, '\\"')}"`
+                const fallbackCommand: Command|null = response
+                    ? {
+                        "tool" : "ShellExecute",
+                        "arguments": `{"shell_execute": "echo ${response} }"`
+                    }
                     : null;
 
                 if (fallbackCommand) {
-                    const result = await runShell(fallbackCommand);
-                    webviewView?.webview.postMessage({ type: "shellRunning", command: fallbackCommand });
+                    const result = await this.toolRegistry.executeTool(fallbackCommand.tool, fallbackCommand.arguments);
+                    webviewView?.webview.postMessage({ type: "toolRunning", command: fallbackCommand });
                     webviewView?.webview.postMessage({
-                        type: "shellResult",
-                        command: fallbackCommand,
-                        stdout: result.stdout || "(no output)",
-                        stderr: result.stderr || ""
+                        type: "toolResult",
+                        command: JSON.stringify(fallbackCommand),
+                        result: result || "(no output)",
                     });
                     return {
                         goal_id: goalId,
                         goal: currentGoal,
-                        command: fallbackCommand,
-                        executionResult: { stdout: result.stdout, stderr: result.stderr },
+                        command: JSON.stringify(fallbackCommand),
+                        executionResult: result,
                         response,
                         timestamp: Date.now(),
                         status: AGENT_STATUS.STATUS_SUCCESS
@@ -183,30 +195,25 @@ DO NOT REPLY ANYTHING other than JSON.
                     status: AGENT_STATUS.STATUS_FAILURE
                 };
             }
-
-            let stdout = "";
-            let stderr = "";
+            let result = null;
             try {
-                const result = await runShell(command);
-                stdout = result.stdout;
-                stderr = result.stderr;
+                result = await this.toolRegistry.executeTool(tool, args);
             } catch (e: any) {
-                stderr = e.message;
+                result = e.message;
             }
 
-            webviewView?.webview.postMessage({ type: "shellRunning", command });
+            webviewView?.webview.postMessage({ type: "toolRunning", command });
             webviewView?.webview.postMessage({
-                type: "shellResult",
-                command,
-                stdout: stdout || "(no output)",
-                stderr: stderr || ""
+                type: "toolResult",
+                command: JSON.stringify(command),
+                executionResult: result,
             });
 
             const currCtx: CommandContext = {
                 goal_id: goalId,
                 goal: currentGoal,
-                command,
-                executionResult: { stdout, stderr },
+                command: JSON.stringify(command),
+                executionResult: result,
                 response,
                 timestamp: Date.now()
             };
