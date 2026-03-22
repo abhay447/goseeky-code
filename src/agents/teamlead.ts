@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 import * as os from 'os';
 import * as process from 'process';
 import { AIProvider, ChatManager } from "../providers";
-import { ShellAgent, AGENT_STATUS } from "./shell_agent";
+import { ShellAgent, AGENT_STATUS } from "./shellAgent";
 import { isStopped, resetStop } from "../webview/agentExecution";
 
 // ── Shared env info ───────────────────────────────────────────────────────────
@@ -56,7 +56,7 @@ You are an expert in planning and task breakdown.
 5. Be mindful that you and the sub agent are both backed by a smaller llm (9000 tokens).
     a. Always check filesizes before completely reading them.
     b. Don't read multiple files in same command.
-    c. Don't read more than 500 lines at once
+    c. Don't read more than 500 lines at once.
 
 
 Please respond in the following format.
