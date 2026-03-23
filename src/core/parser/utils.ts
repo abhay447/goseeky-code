@@ -1,15 +1,5 @@
 import fs from "fs";
-
-export function extractCodeSnippetFromFile(
-  filePath: string,
-  startIndex: number,
-  endIndex: number,
-  shouldTruncate: boolean = true
-) {
-  const fullCode = fs.readFileSync(filePath, "utf-8");
-  return extractCodeSnippet(fullCode,startIndex,endIndex,shouldTruncate);
-
-}
+import { HybridStore } from "../search/hybridStore";
 
 export function extractCodeSnippet(
   fullCode: string,
@@ -23,6 +13,30 @@ export function extractCodeSnippet(
   } else {
     return code;
   }
+}
+
+export async function extractEntityCode(entityId: string, hybridStore: HybridStore){
+  let entity = await hybridStore.getEntity(entityId);
+    if (entity.code?.endsWith("..")) {
+      return extractCodeSnippetFromFile(
+        entity.filePath,
+        entity.startIndex!,
+        entity.endIndex!,
+        false
+      )
+    }
+    return entity.code!;
+}
+
+ function extractCodeSnippetFromFile(
+  filePath: string,
+  startIndex: number,
+  endIndex: number,
+  shouldTruncate: boolean = true
+) {
+  const fullCode = fs.readFileSync(filePath, "utf-8");
+  return extractCodeSnippet(fullCode,startIndex,endIndex,shouldTruncate);
+
 }
 
 function truncate(code: string, maxChars = 1000) {

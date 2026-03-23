@@ -1,5 +1,6 @@
 import { HybridStore } from "../core/search/hybridStore";
-import { GetEntityCode, RepoSearch } from "./codeAnalysisTools";
+import { AIProvider } from "../providers";
+import { AnalyseEntityCode, GetEntityCode, RepoSearch } from "./codeAnalysisTools";
 import { ShellExecute } from "./shellTools";
 import { AgentTool } from "./types";
 
@@ -17,7 +18,8 @@ export class ToolRegistry {
         this.toolsList = [
             new RepoSearch(hybridStore),
             new GetEntityCode(hybridStore),
-            new ShellExecute()
+            new ShellExecute(),
+            new AnalyseEntityCode(hybridStore)
         ]
 
         this.toolsMap = new Map(this.toolsList.map(t => [t.name, t] as const))
@@ -44,11 +46,12 @@ export class ToolRegistry {
         `
     }
 
-    async executeTool(toolName: string, args: Record<string, unknown>){
+    async executeTool(toolName: string, args: Record<string, unknown>, client: AIProvider){
         if(!this.toolsMap.has(toolName)){
             throw `Invalid tool name selected : ${toolName}`
         }
         let tool = this.toolsMap.get(toolName)!;
+        tool.setAiProvider(client);
         let result = await tool.execute(args);
         console.log(`tool : ${tool}, result: ${result}`);
         return result;

@@ -1,5 +1,6 @@
 import { AgentTool } from "./types";
 import { runShell } from "../utils/shellUtils";
+import { AIProvider } from "../providers";
 
 export class ShellExecute implements AgentTool {
   name: string
@@ -13,6 +14,9 @@ export class ShellExecute implements AgentTool {
       Argument Schema: {"shell_command" : <shell_script>}
     `
   }
+
+  setAiProvider(client: AIProvider) {}
+
   async execute(input: Record<string, unknown>): Promise<string> {
     let result = await runShell(input.shell_command as string);
     return JSON.stringify(result)
