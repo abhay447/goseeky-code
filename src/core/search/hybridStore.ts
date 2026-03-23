@@ -193,9 +193,16 @@ export class HybridStore {
         // =========================
         // 5️⃣ Final ranking
         // =========================
+        // console.log("unsorted search results " + JSON.stringify(finalResults));
+        // console.log("topK:", topK, typeof topK);
         return finalResults
-            .sort((a, b) => b.score - a.score) // ⚠️ critical fix
+            .map(r => ({
+                ...r,
+                score: typeof r.score === "number" ? r.score : 0
+            }))
+            .sort((a, b) => b.score - a.score)
             .slice(0, topK);
+        
     }
 
     async getEntity(entityId : string): Promise<Entity>{

@@ -390,6 +390,25 @@
                 else { appendToIteration(card); }
             }
 
+            if (msg.type === 'toolResult') {
+                const command = JSON.stringify(msg.tool) + " \n " + JSON.stringify(msg.arguments) + " \n ";
+                const runningId = 'running-' + hashCommand(command).slice(0, 12);
+                const runningCard = document.getElementById(runningId);
+
+                const card = document.createElement('div');
+                card.className = 'card result';
+                const shortCmd = command.length > 60 ? command.slice(0, 60) + '...' : command;
+                card.innerHTML = '<div class="card-title">$ ' + escapeHtml(shortCmd) + '</div>';
+
+                if (msg.result && msg.result !== '(no output)') {
+                    const pre = document.createElement('pre');
+                    pre.textContent = command + msg.result;
+                    card.appendChild(pre);
+                }
+                if (runningCard) { runningCard.replaceWith(card); }
+                else { appendToIteration(card); }
+            }
+
             if (msg.type === 'agentDone') {
                 const statusMap = {
                     'FINISHED':       { cls: 'done-finished', icon: '✅', label: 'Done' },

@@ -4,6 +4,7 @@ import { isStopped } from "../webview/agentExecution";
 import { runShell } from "../utils/shellUtils";
 import { buildGoalEvaluationPrompt, getExtensionContextInfo } from "./teamlead";
 import { ToolRegistry } from "../tools/toolRegistry";
+import { stringToSingleJsonBlock } from "../utils/jsonUtils";
 
 export enum AGENT_STATUS {
     STATUS_SUCCESS = "STATUS_SUCCESS",
@@ -17,13 +18,14 @@ interface ExecutionResult {
 
 interface Command {
     tool: string
-    arguments: string
+    arguments: Record<string, unknown>
 }
 
 interface CommandContext {
     goal_id?: string;
     goal?: string;
-    command?: string;
+    tool?: string;
+    arguments?: Record<string, unknown>;
     executionResult?: string;
     response?: string;
     timestamp?: number;
@@ -48,8 +50,9 @@ export class CodeAgent {
         const envInfo = getExtensionContextInfo();
         return `
 You are a coding System agent which accepts user goals and tries to execute them tools at hand.
-Here is the list of accessible tools:
+
 ${this.toolRegistry.listToolsPrompt()}
+
 Here is the basic info about the current shell execution environment.
 ${envInfo}
 
@@ -58,12 +61,15 @@ Based on the conversation history you need to respond with the following attribu
 {
     "goal" : <goal from input>,
     "tool" : <tool_name>,
-    "arguments" : {ARGUMENTS_JSON_AS_PER_TOOL_DETAILS, should be stringified json as it will be reparsed}
+    "arguments" : {ARGUMENTS_JSON_AS_PER_TOOL_DETAILS, should be valid json}
 }
 
-IMPORTANT: You MUST always provide a non-empty "tool" and "arguments". If the goal requires a text response,
-use: tool=ShellExecute arguments='echo "<msg to user>" .
-Never leave "tool" and "arguments"  empty or null.
+IMPORTANT:
+1. You MUST always provide a non-empty "tool" and "arguments". If the goal requires a text response,
+    use: tool=ShellExecute arguments={"shell_command" : "echo \"<msg to user>\" "} .
+2. Never leave "tool" and "arguments"  empty or null.
+3. arguments field should always comply with argument schema of selected tool
+4. Try to avoid retries of tool+argument combinations unless there is a strong reason for it.
 
 Your conversation history will occasionally also contain inputs from your team lead who has analysed your previous attempts, use that to steer approach in right direction.
 DO NOT REPLY ANYTHING other than JSON.
@@ -72,7 +78,7 @@ DO NOT REPLY ANYTHING other than JSON.
 
     private safeParseJSON(raw: string, label: string): any | null {
         try {
-            const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
+            const cleaned = stringToSingleJsonBlock(raw)!.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
             return JSON.parse(cleaned);
         } catch (e) {
             console.error(`[CodeAgent] Failed to parse ${label} JSON:`, raw);
@@ -111,7 +117,7 @@ DO NOT REPLY ANYTHING other than JSON.
                     client,
                     { role: "system", content: this.buildSystemPrompt() },
                     { role: "user", content: currentGoal }
-                );
+                )!;
             } catch (e: any) {
                 return {
                     goal_id: goalId,
@@ -131,7 +137,7 @@ DO NOT REPLY ANYTHING other than JSON.
                     status: AGENT_STATUS.STATUS_FAILURE
                 };
             }
-
+            console.log("subagent reply " + reply)
             const parsedMsg = this.safeParseJSON(reply, "subagent");
             if (!parsedMsg) {
                 commandRunHistory.push({
@@ -143,10 +149,10 @@ DO NOT REPLY ANYTHING other than JSON.
                 });
                 continue;
             }
-
+            console.log("parsedMsg " + JSON.stringify(parsedMsg))
             const response: string = parsedMsg["response"] ?? "";
             const tool: string = (parsedMsg["tool"] ?? "").trim();
-            const args: string = (parsedMsg["arguments"] ?? "").trim();
+            const args = (parsedMsg["arguments"]);
             const command = {"tool": tool, "arguments": args}
 
             if (!tool) {
@@ -154,7 +160,7 @@ DO NOT REPLY ANYTHING other than JSON.
                 const fallbackCommand: Command|null = response
                     ? {
                         "tool" : "ShellExecute",
-                        "arguments": `{"shell_execute": "echo ${response} }"`
+                        "arguments": {"shell_command": "echo ${response}" }
                     }
                     : null;
 
@@ -163,13 +169,15 @@ DO NOT REPLY ANYTHING other than JSON.
                     webviewView?.webview.postMessage({ type: "toolRunning", command: fallbackCommand });
                     webviewView?.webview.postMessage({
                         type: "toolResult",
-                        command: JSON.stringify(fallbackCommand),
+                        tool: fallbackCommand.tool,
+                        arguments: fallbackCommand.arguments,
                         result: result || "(no output)",
                     });
                     return {
                         goal_id: goalId,
                         goal: currentGoal,
-                        command: JSON.stringify(fallbackCommand),
+                        tool: fallbackCommand.tool,
+                        arguments: fallbackCommand.arguments,
                         executionResult: result,
                         response,
                         timestamp: Date.now(),
@@ -205,14 +213,16 @@ DO NOT REPLY ANYTHING other than JSON.
             webviewView?.webview.postMessage({ type: "toolRunning", command });
             webviewView?.webview.postMessage({
                 type: "toolResult",
-                command: JSON.stringify(command),
-                executionResult: result,
+                tool: tool,
+                arguments: args,
+                result: result || "(no output)",
             });
 
             const currCtx: CommandContext = {
                 goal_id: goalId,
                 goal: currentGoal,
-                command: JSON.stringify(command),
+                tool: tool,
+                arguments: args,
                 executionResult: result,
                 response,
                 timestamp: Date.now()
@@ -239,7 +249,7 @@ DO NOT REPLY ANYTHING other than JSON.
                     client,
                     { role: "system", content: buildGoalEvaluationPrompt() },
                     { role: "user", content: JSON.stringify(reviewCtx) }
-                );
+                )!;
             } catch (e: any) {
                 currCtx.status = AGENT_STATUS.STATUS_SUCCESS;
                 return currCtx;
@@ -267,7 +277,8 @@ DO NOT REPLY ANYTHING other than JSON.
         return {
             goal_id: goalId,
             goal: last?.goal ?? userGoal,
-            command: last?.command,
+            tool: last?.tool,
+            arguments: last?.arguments,
             executionResult: last?.executionResult,
             timestamp: Date.now(),
             response: "Goal couldn't be finished in requisite number of iterations",

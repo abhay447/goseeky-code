@@ -12,9 +12,9 @@ console.log(repoRoot);
 // Runner with concurrency control
 // -----------------------------
 async function run() {
-  const hybridStore = await indexRepo(repoRoot)
+  // const hybridStore = await indexRepo(repoRoot)
 
-  const results = await hybridStore.search("ChatManager");
+  // const results = await hybridStore.search("ChatManager");
   // const filePath = "/Users/rishikamishra/work/sarvam_poc/sarvam-code/src/providers/chatManager.ts";
   // const extractor = getExtractorForFile(filePath);
   //   if (!extractor) return null;
@@ -24,8 +24,9 @@ async function run() {
   //   const result = extractor.extract(code, filePath);
   //   console.log(result);
 
-  console.log(results);
+  // console.log(results);
   // console.log(JSON.stringify(results));
+  console.log(JSON.parse("{\"shell_command\": \"find /Users/rishikamishra/work/sarvam_poc/sarvam-code -type f -name \\\"README.md\\\" -o -name \\\"docs\\\" -type d | head -20\"}"))
 }
 
 run();

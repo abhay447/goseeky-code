@@ -5,6 +5,7 @@ import { AIProvider, ChatManager } from "../providers";
 import { CodeAgent, AGENT_STATUS } from "./codeAgent";
 import { isStopped, resetStop } from "../webview/agentExecution";
 import { ToolRegistry } from "../tools/toolRegistry";
+import { stringToSingleJsonBlock } from "../utils/jsonUtils";
 
 // ── Shared env info ───────────────────────────────────────────────────────────
 export function getExtensionContextInfo(): string {
@@ -24,15 +25,15 @@ export function buildGoalEvaluationPrompt(): string {
     return `
 You are a team lead who has access to a goal and the execution results from a subagent for that task.
 Your job is to evaluate firstly if the results look satisfactory to the goal.
-Secondly look at the underlying commands, thinking, errors and results to make suggestions to the subagent.
-You will be provided with a history of commands run by the subagent to steer the reasoning in the right direction.
+Secondly look at the underlying tools and arguments, thinking, errors and results to make suggestions to the subagent.
+You will be provided with a history of runs run by the subagent to steer the reasoning in the right direction.
 
 Please respond in the following format.
 {
     "goal" : <subagent goal from request>,
     "subagent_response_score" : <floating point, between 1 and 5>,
     "review_comments" : <describe what went wrong/right in this attempt, if it failed then why did it fail>,
-    "modified_goal": <modified goal that will lead subagent to better command generation/execution, this will be used by subagent as the user goal in next iteration>
+    "modified_goal": <modified goal that will lead subagent to better execution, this will be used by subagent as the user goal in next iteration>
 }
 
 DO NOT REPLY ANYTHING other than JSON.
@@ -41,10 +42,10 @@ DO NOT REPLY ANYTHING other than JSON.
 
 export function buildTaskBreakdownPrompt(): string {
     return `
-You are a team lead responsible for dealing with user queries and breaking them into smaller goals/tasks to be executed by a shell subagent.
+You are a team lead responsible for dealing with user queries and breaking them into smaller goals/tasks to be executed by subagents.
 You are an expert in planning and task breakdown.
 
-1. Since the subagent is able to run only shell inline scripts, all goals should be small enough to fit into a one line shell script.
+1. All goals should be small enough to fit into a one line shell script.
 2. Sometimes along with the user query you will also get an existing task breakdown list and why it didn't work.
    a. Use that information to modify the plan. Retain relevant goal_id and goal_msgs as they will be used to cache inputs.
 3. Since goals can have dependencies amongst themselves, return goals in topologically sorted order.
@@ -96,7 +97,7 @@ export class TeamLeadAgent {
 
     private safeParseJSON(raw: string, label: string): any | null {
         try {
-            const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
+            const cleaned = stringToSingleJsonBlock(raw)!.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
             return JSON.parse(cleaned);
         } catch (e) {
             console.error(`[TeamLeadAgent] Failed to parse ${label} JSON:`, raw);

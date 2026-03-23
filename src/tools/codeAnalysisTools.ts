@@ -2,32 +2,35 @@ import { HybridStore } from "../core/search/hybridStore";
 import { extractCodeSnippetFromFile } from "../core/parser/utils";
 import { AgentTool } from "./types";
 
-
 export class RepoSearch implements AgentTool {
   private hybridStore: HybridStore
-  name: string = 'RepoSearchTool'
-  toolDescription: string = `This tools allows the agent to search the repo for a query string and returns matching source code entities. Arguments {"query" : <string_to_search>}`
+  name: string
+  toolDescription: string
   constructor(hybridStore: HybridStore) {
     this.hybridStore = hybridStore;
+    this.name = 'RepoSearchTool'
+    this.toolDescription= `This tools allows the agent to search the repo for a query string and returns matching source code entities. Argument Schema: {"query" : <string_to_search>}`
   }
-  async execute(input: string): Promise<string> {
-    let jsonInput = JSON.parse(input);
-    return JSON.stringify(this.hybridStore.search(jsonInput["query"]));
+  async execute(input: Record<string, unknown>): Promise<string> {
+    let result =  await this.hybridStore.search(input.query as string);
+    // console.log("Search results" + result);
+    return JSON.stringify(result);
   }
 
 }
 
 export class GetEntityCode implements AgentTool {
   private hybridStore: HybridStore;
-  name: string = `GetEntityCode`;
-  toolDescription: string = `Reads source for the entity_id requested. Arguments {"entity_id" : <entity id from RepoSearchTool whose code is required by agent>}`;
+  name: string
+  toolDescription: string
   constructor(hybridStore: HybridStore) {
     this.hybridStore = hybridStore;
+    this.name = `GetEntityCode`;
+    this.toolDescription = `Reads source for the entity_id requested. Argument Schema: {"entity_id" : <entity id from RepoSearchTool whose code is required by agent>}`;
+
   }
-  async execute(input: string): Promise<string> {
-    let jsonInput = JSON.parse(input);
-    let entityId = jsonInput["entity_id"];
-    let entity = await this.hybridStore.getEntity(entityId);
+  async execute(input: Record<string, unknown>): Promise<string> {
+    let entity = await this.hybridStore.getEntity(input.entity_id as string);
     if (entity.code?.endsWith("..")) {
       return extractCodeSnippetFromFile(
         entity.filePath,
