@@ -165,7 +165,7 @@ DO NOT REPLY ANYTHING other than JSON.
                     : null;
 
                 if (fallbackCommand) {
-                    const result = await this.toolRegistry.executeTool(fallbackCommand.tool, fallbackCommand.arguments);
+                    const result = await this.toolRegistry.executeTool(fallbackCommand.tool, fallbackCommand.arguments, client);
                     webviewView?.webview.postMessage({ type: "toolRunning", command: fallbackCommand });
                     webviewView?.webview.postMessage({
                         type: "toolResult",
@@ -205,7 +205,7 @@ DO NOT REPLY ANYTHING other than JSON.
             }
             let result = null;
             try {
-                result = await this.toolRegistry.executeTool(tool, args);
+                result = await this.toolRegistry.executeTool(tool, args, client);
             } catch (e: any) {
                 result = e.message;
             }
