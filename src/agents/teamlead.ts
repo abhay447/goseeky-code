@@ -38,6 +38,7 @@ Please respond in the following format.
 }
 
 DO NOT REPLY ANYTHING other than JSON.
+DO NOT take the conversation off track , keep it focused on the goal.
 `;
 }
 

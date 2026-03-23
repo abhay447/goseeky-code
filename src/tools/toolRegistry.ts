@@ -1,6 +1,7 @@
 import { HybridStore } from "../core/search/hybridStore";
 import { AIProvider } from "../providers";
 import { AnalyseEntityCode, GetEntityCode, RepoSearch } from "./codeAnalysisTools";
+import { SendToUser } from "./ioTools";
 import { ShellExecute } from "./shellTools";
 import { AgentTool } from "./types";
 
@@ -19,7 +20,8 @@ export class ToolRegistry {
             new RepoSearch(hybridStore),
             new GetEntityCode(hybridStore),
             new ShellExecute(),
-            new AnalyseEntityCode(hybridStore)
+            new AnalyseEntityCode(hybridStore),
+            new SendToUser()
         ]
 
         this.toolsMap = new Map(this.toolsList.map(t => [t.name, t] as const))
