@@ -10,7 +10,7 @@ export class RepoSearch implements AgentTool {
   constructor(hybridStore: HybridStore) {
     this.hybridStore = hybridStore;
     this.name = 'RepoSearchTool'
-    this.toolDescription= `This tools allows the agent to search the repo for a query string and returns matching source code entities. Argument Schema: {"query" : <string_to_search>}`
+    this.toolDescription= `This tools allows the agent to search the repo for a query string and returns matching source code entities. It does embedddings and keyword search, do not try regex expressions. Argument Schema: {"query" : <string_to_search>}`
   }
 
   setAiProvider(client: AIProvider) {}

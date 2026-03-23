@@ -31,6 +31,7 @@ interface CommandContext {
     timestamp?: number;
     reviewComments?: string;
     status?: AGENT_STATUS;
+    currentReply?: string;
 }
 
 interface ReviewContext {
@@ -65,11 +66,14 @@ Based on the conversation history you need to respond with the following attribu
 }
 
 IMPORTANT:
-1. You MUST always provide a non-empty "tool" and "arguments". If the goal requires a text response,
-    use: tool=ShellExecute arguments={"shell_command" : "echo \"<msg to user>\" "} .
-2. Never leave "tool" and "arguments"  empty or null.
-3. arguments field should always comply with argument schema of selected tool
-4. Try to avoid retries of tool+argument combinations unless there is a strong reason for it.
+    - ShellExecute tool is way too generic and should be used as a tool of last resort.
+    - Try to use RepoSearch tool to build context, since you are coding agent the first instinct should be to search for relevant entities in code base. Use shell find/grep as a backup.
+    - Try not to load entity code in context unless required. you can use analysis tool for more NLP related queries on code. Use GetEntity code as a backup.
+    - Never leave "tool" and "arguments"  empty or null.
+    - arguments field should always comply with argument schema of selected tool
+    - Try to avoid retries of tool+argument combinations unless there is a strong reason for it.
+    - You MUST always provide a non-empty "tool" and "arguments". If the goal requires a text response,
+        use: tool=ShellExecute arguments={"shell_command" : "echo \"<msg to user>\" "} .
 
 Your conversation history will occasionally also contain inputs from your team lead who has analysed your previous attempts, use that to steer approach in right direction.
 DO NOT REPLY ANYTHING other than JSON.
@@ -262,9 +266,12 @@ DO NOT REPLY ANYTHING other than JSON.
             }
 
             const reviewScore = (teamLeadParsed["subagent_response_score"] as number) ?? 0;
-
+            const currentReply = (teamLeadParsed["current_reply"] as string) ?? 0;
+            currCtx.currentReply = currentReply;
+            
             if (reviewScore >= REVIEW_RESPONSE_SCORE_THRESHOLD) {
                 currCtx.status = AGENT_STATUS.STATUS_SUCCESS;
+
                 return currCtx;
             }
 

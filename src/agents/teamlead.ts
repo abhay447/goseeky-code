@@ -33,7 +33,8 @@ Please respond in the following format.
     "goal" : <subagent goal from request>,
     "subagent_response_score" : <floating point, between 1 and 5>,
     "review_comments" : <describe what went wrong/right in this attempt, if it failed then why did it fail>,
-    "modified_goal": <modified goal that will lead subagent to better execution, this will be used by subagent as the user goal in next iteration>
+    "modified_goal": <modified goal that will lead subagent to better execution, this will be used by subagent as the user goal in next iteration>,
+    "current_reply" : <if you were to look at the results what would the ideal response for the goal look like if no further iterations were possible beyond this point"
 }
 
 DO NOT REPLY ANYTHING other than JSON.
@@ -210,6 +211,7 @@ export class TeamLeadAgent {
                 goal.output = JSON.stringify(subAgentResult);
 
                 if (subAgentResult.status === AGENT_STATUS.STATUS_FAILURE) {
+                    // plan execution failure, might need replanning
                     failedGoal = goal;
                     webviewView.webview.postMessage({
                         type: "agentSubGoal",
@@ -218,12 +220,16 @@ export class TeamLeadAgent {
                     });
                     break;
                 }
-
+                // goal succeeded, show and store result
                 goalCache.set(goal.goal_id, goal);
                 webviewView.webview.postMessage({
                     type: "agentSubGoal",
                     title: goal.goal_id,
                     status: "FINISHED"
+                });
+                webviewView.webview.postMessage({
+                    type: "reply",
+                    text: subAgentResult.currentReply
                 });
             }
 
