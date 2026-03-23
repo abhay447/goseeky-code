@@ -67,7 +67,8 @@ Based on the conversation history you need to respond with the following attribu
 
 IMPORTANT:
     - ShellExecute tool is way too generic and should be used as a tool of last resort.
-    - Try to use RepoSearch tool to build context, since you are coding agent the first instinct should be to search for relevant entities in code base. Use shell find/grep as a backup.
+    - Try to use RepoSearch tool to build context, since you are coding agent the first instinct should be to search for relevant entities in code base. 
+        * Do not repeat search with same query instead Use ShellExecute with find/grep as a backup if RepoSearch is unable to find the right snippets.
     - Try not to load entity code in context unless required. you can use analysis tool for more NLP related queries on code. Use GetEntity code as a backup.
     - Never leave "tool" and "arguments"  empty or null.
     - arguments field should always comply with argument schema of selected tool
@@ -268,7 +269,7 @@ DO NOT REPLY ANYTHING other than JSON.
             const reviewScore = (teamLeadParsed["subagent_response_score"] as number) ?? 0;
             const currentReply = (teamLeadParsed["current_reply"] as string) ?? 0;
             currCtx.currentReply = currentReply;
-            
+
             if (reviewScore >= REVIEW_RESPONSE_SCORE_THRESHOLD) {
                 currCtx.status = AGENT_STATUS.STATUS_SUCCESS;
 
