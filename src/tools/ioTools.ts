@@ -7,10 +7,7 @@ export class SendToUser implements AgentTool {
   toolDescription: string
   constructor() {
     this.name = 'SendToUser'
-    this.toolDescription = `
-      This tools allows the agent to send messages to user.
-      Argument Schema: {"message" : <msg to user>}
-    `
+    this.toolDescription = "This tools allows the agent to send messages to user. Argument Schema: {\"message\" : <msg to user>}"
   }
 
   setAiProvider(client: AIProvider) {}

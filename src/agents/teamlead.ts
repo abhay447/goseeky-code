@@ -42,7 +42,7 @@ DO NOT take the conversation off track , keep it focused on the goal.
 `;
 }
 
-export function buildTaskBreakdownPrompt(): string {
+export function buildTaskBreakdownPrompt(toolRegistry: ToolRegistry): string {
     return `
 You are a team lead responsible for dealing with user queries and breaking them into smaller goals/tasks to be executed by subagents.
 You are an expert in planning and task breakdown.
@@ -61,7 +61,8 @@ You are an expert in planning and task breakdown.
     a. Always check filesizes before completely reading them.
     b. Don't read multiple files in same command.
     c. Don't read more than 500 lines at once.
-
+6. Each goal should be executable by a single tool available to subagent. Do not make sub goals complex.
+    a. Here is the tools list : ${toolRegistry.listToolsPrompt()}
 
 Please respond in the following format.
 {
@@ -152,7 +153,7 @@ export class TeamLeadAgent {
             try {
                 reply = await this.teamLeadChatManager.chat(
                     client,
-                    { role: "system", content: buildTaskBreakdownPrompt() },
+                    { role: "system", content: buildTaskBreakdownPrompt(toolRegistry) },
                     { role: "user", content: currentQuery }
                 );
             } catch (e: any) {

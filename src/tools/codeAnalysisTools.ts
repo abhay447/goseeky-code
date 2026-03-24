@@ -10,7 +10,7 @@ export class RepoSearch implements AgentTool {
   constructor(hybridStore: HybridStore) {
     this.hybridStore = hybridStore;
     this.name = 'RepoSearchTool'
-    this.toolDescription= `This tools allows the agent to search the repo for a query string and returns matching source code entities. It does embedddings and keyword search, do not try regex expressions. Argument Schema: {"query" : <string_to_search>}`
+    this.toolDescription= "Use this tool to discover logic, patterns, or business rules within the source code. It is designed to find 'how' things are implemented or where specific features live. Avoid using this for repository-wide metadata or structural audits. Argument Schema: {\"query\" : <string_to_search>}"
   }
 
   setAiProvider(client: AIProvider) {}
@@ -29,7 +29,7 @@ export class GetEntityCode implements AgentTool {
   constructor(hybridStore: HybridStore) {
     this.hybridStore = hybridStore;
     this.name = `GetEntityCode`;
-    this.toolDescription = `Reads source for the entity_id requested. Argument Schema: {"entity_id" : <entity id from RepoSearchTool whose code is required by agent,obtained by RepoSearchTool>}`;
+    this.toolDescription = "Reads source for the entity_id requested. Argument Schema: {\"entity_id\" : <entity id from RepoSearchTool whose code is required>}";
 
   }
   setAiProvider(client: AIProvider) {}
@@ -48,7 +48,7 @@ export class AnalyseEntityCode implements AgentTool {
   constructor(hybridStore: HybridStore) {
     this.hybridStore = hybridStore;
     this.name = `AnalyseEntity`;
-    this.toolDescription = `Allows Q&A and natural language analysis of entity by analysing entity code . Argument Schema: {"entity_id" : <entity id from RepoSearchTool whose code needs to be analysed, obtained by RepoSearchTool>, "analysis_prompt" : <user supplied prompt on how they want to analyse the code>}`;
+    this.toolDescription = "Allows Q&A and natural language analysis of entity by analysing entity code. Argument Schema: {\"entity_id\" : <entity id from RepoSearchTool>, \"analysis_prompt\" : <user supplied prompt on how they want to analyse the code>}";
 
   }
   isIntelligentTool(): boolean {
