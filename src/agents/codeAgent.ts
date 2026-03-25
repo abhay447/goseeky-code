@@ -173,14 +173,14 @@ DO NOT REPLY ANYTHING other than JSON.
                         type: "toolResult",
                         tool: fallbackCommand.tool,
                         arguments: fallbackCommand.arguments,
-                        result: result || "(no output)",
+                        result: result.result || "(no output)",
                     });
                     return {
                         goal_id: goalId,
                         goal: currentGoal,
                         tool: fallbackCommand.tool,
                         arguments: fallbackCommand.arguments,
-                        executionResult: result,
+                        executionResult: result.result,
                         response,
                         timestamp: Date.now(),
                         status: AGENT_STATUS.STATUS_SUCCESS

@@ -4,17 +4,26 @@ import { AgentState, applyEdit, createFile, switchProvider, requestStop } from "
 import { TeamLeadAgent } from "../agents/teamlead";
 import { runShell } from "../utils/shellUtils";
 import { ToolRegistry } from "../tools/toolRegistry";
+import { GoSeekyAgent } from "../agents/goseekyAgent";
 
 export { AgentState };
 
 // Module-level agent instance — persists across messages to maintain conversation state
 let teamLeadAgent: TeamLeadAgent | null = null;
+let goSeekyAgent: GoSeekyAgent | null = null;
 
-function getAgent(): TeamLeadAgent {
-    if (!teamLeadAgent) {
-        teamLeadAgent = new TeamLeadAgent();
+// function getAgent(): TeamLeadAgent {
+//     if (!teamLeadAgent) {
+//         teamLeadAgent = new TeamLeadAgent();
+//     }
+//     return teamLeadAgent;
+// }
+
+function getAgent(): GoSeekyAgent {
+    if (!goSeekyAgent) {
+        goSeekyAgent = new GoSeekyAgent();
     }
-    return teamLeadAgent;
+    return goSeekyAgent;
 }
 
 export async function handleAgentMessage(

@@ -6,6 +6,12 @@ import { ShellExecute } from "./shellTools";
 import { AgentTool } from "./types";
 
 
+export interface ToolResult {
+    tool: string;
+    args: string;
+    result: string;
+}
+
 export class ToolRegistry {
     hybridStore: HybridStore;
     toolsList: (RepoSearch | GetEntityCode | ShellExecute)[];
@@ -18,7 +24,7 @@ export class ToolRegistry {
 
         this.toolsList = [
             new RepoSearch(hybridStore),
-            new GetEntityCode(hybridStore),
+            // new GetEntityCode(hybridStore),
             new ShellExecute(),
             new AnalyseEntityCode(hybridStore),
             new SendToUser()
@@ -37,15 +43,24 @@ export class ToolRegistry {
 
     listToolsPrompt() {
         return `
-        Here is the tools list:
         ${JSON.stringify(Object.fromEntries(this.toolsMetaMap), null, 2)}
-
-        Respond in the following format:
-        {
-            "tool" : <tool_name>,
-            "arguments" : {ARGUMENTS_JSON_AS_PER_TOOL_DETAILS}
-        }
         `
+    }
+
+    async summariseToolResult(client: AIProvider, tool: string, args: string, result: string){
+        const prompt = `
+        You will be given a tool, args and it's execution output.
+        Summarise the result of the  tool execution.
+        Summarised result should be less than 1000 chars.
+        RETURN SUMARRIZED result string only.
+        `
+        return await client?.chat(
+        [
+            {"role" : "system", "content": prompt,},
+            {"role" : "user", "content": `tool: ${tool} || args: ${args}  || result: ${result}`,}
+        ]
+        )!;
+        
     }
 
     async executeTool(toolName: string, args: Record<string, unknown>, client: AIProvider){
@@ -55,8 +70,15 @@ export class ToolRegistry {
         let tool = this.toolsMap.get(toolName)!;
         tool.setAiProvider(client);
         let result = await tool.execute(args);
+        if(result.length > 1000) {
+            result = await this.summariseToolResult(client, toolName, JSON.stringify(args), result);
+        }
         console.log(`tool : ${tool}, result: ${result}`);
-        return result;
+        return {
+            "tool" : toolName,
+            "args" : JSON.stringify(args),
+            "result": result
+        };
     }
 
 

@@ -4,6 +4,13 @@ import { GraphStore } from "./graphStore";
 import { Edge, Entity } from "../parser/types";
 import { KWStore, tokenize } from "./keywordStore";
 
+export interface SearchResult {
+    score: number;
+    id: string;
+    entity: Entity;
+    neighbors: Edge[];
+}
+
 export class HybridStore {
     private vectorStore = new HNSWVectorStore(384); // MiniLM dim
     private graphStore = new GraphStore();
@@ -43,7 +50,7 @@ export class HybridStore {
         // console.log(this.graphStore.listEntities());
     }
 
-    async search(query: string, topK = 5) {
+    async search(query: string, topK = 5) : Promise<SearchResult[]> {
         if (!this.finalized) {
             throw new Error("Search attempted before finalize");
         }
@@ -127,10 +134,10 @@ export class HybridStore {
         for (const [id, baseScore] of combinedScores.entries()) {
             let score = baseScore;
 
-            const entity = this.entityDb.get(id);
+            const entity = { ... this.entityDb.get(id)!};
             if (!entity) continue;
 
-            const name = entity.name.toLowerCase();
+            const name = entity.name!.toLowerCase();
 
             // --------------------------------
             // 🔥 EXACT MATCH BOOST
@@ -172,7 +179,7 @@ export class HybridStore {
             // --------------------------------
             // 🔥 GRAPH BOOST
             // --------------------------------
-            const neighbors = this.graphStore.getNeighbors(entity.name);
+            const neighbors = this.graphStore.getNeighbors(entity.name!);
             if (neighbors.length > 0) {
                 score += GRAPH_NEIGHBOR_BOOST;
             }
@@ -181,6 +188,8 @@ export class HybridStore {
             // 🔻 FILTER NOISE
             // --------------------------------
             if (score < MIN_SCORE_THRESHOLD) continue;
+
+            entity.code = "REDACTED"
 
             finalResults.push({
                 id,
