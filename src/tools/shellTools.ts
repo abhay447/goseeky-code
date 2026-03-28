@@ -7,7 +7,12 @@ export class ShellExecute implements AgentTool {
   toolDescription: string
   constructor() {
     this.name = 'ShellExecute'
-    this.toolDescription = "Use this tool for environmental observation, file system operations, and repository metadata. This is the primary tool for inspecting the state of the workspace, counting assets, or performing operations that do not require semantic code understanding. Argument Schema: {\"shell_command\" : <shell_script>}"
+    this.toolDescription = `
+      Use this tool for environmental observation, file system operations, and repository metadata. 
+      This is the primary tool for inspecting the state of the workspace, counting assets, or performing operations that do not require semantic code understanding. 
+      In extreme scenarios use this as a fallback swiss army knife when other read/write tools can't help with user query.
+      Argument Schema: {\"shell_command\" : <shell_script>}
+    `
   }
 
   setAiProvider(client: AIProvider) {}

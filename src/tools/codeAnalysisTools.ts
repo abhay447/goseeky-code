@@ -10,7 +10,11 @@ export class RepoSearch implements AgentTool {
   constructor(hybridStore: HybridStore) {
     this.hybridStore = hybridStore;
     this.name = 'RepoSearchTool'
-    this.toolDescription= "Use this tool to discover logic, patterns, or business rules within the source code. It is designed to find 'how' things are implemented or where specific features live. Avoid using this for repository-wide metadata or structural audits. Argument Schema: {\"query\" : <string_to_search>}"
+    this.toolDescription= `
+      Use this tool to discover enttites obtained by parsing source code and their relationships. 
+      This tool doesn't expose and see source code, for analysing source code you should use : AnalyseEntity .
+      DO NOT repeat calls to this tool with same arguments, if something got missed during code parsing and does not appear in search results then you should fallback to ShellExecute tool. 
+      Argument Schema: {\"query\" : <string_to_search>}`
   }
 
   setAiProvider(client: AIProvider) {}

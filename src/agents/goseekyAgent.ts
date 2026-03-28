@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { AIProvider, ChatManager, ChatMessage } from "../providers";
-import { resetStop } from "../webview/agentExecution";
+import { isStopped, resetStop } from "../webview/agentExecution";
 import { ToolRegistry, ToolResult } from "../tools/toolRegistry";
 import { stringToSingleJsonBlock } from "../utils/jsonUtils";
 import { buildPlannerSystemPrompt } from "./prompts";
@@ -70,32 +70,46 @@ export class GoSeekyAgent {
             maxSteps: MAX_STEPS
         }
         let chatMsgs: ChatMessage[] = []
-        for (let iteration = 0; iteration < MAX_STEPS; iteration++) {
-            const decision: PlanningDecision = await this.runPlanner(client, state, toolRegistry, chatMsgs);
-            console.log(JSON.stringify(decision))
-            chatMsgs.push({ "role": "user", "content": `Agent suggested me to :${decision.reasoning}` });
-
-            if (decision.type === "tool") {
-                const result = await toolRegistry.executeTool(decision.tool_name!, decision.arguments!, client);
-                webviewView?.webview.postMessage({
-                    type: "toolResult",
-                    tool: result.tool,
-                    arguments: result.args,
-                    result: result.result || "(no output)",
-                });
-                // state = updateStateWithTool(state, decision, result);
-                state.toolResults.push(result);
-                state.steps += 1;
-                chatMsgs.push({ "role": "user", "content": "Executed the requested tool and added results to state" });
-            } else if (decision.type === "final") {
-                state.answer = decision.answer;
-                webviewView.webview.postMessage({
+        let step = 0;
+        while(step < MAX_STEPS){
+            try{
+                if(isStopped()){
+                    webviewView.webview.postMessage({
                     type: "agentDone",
-                    status: "FINISHED",
-                    message: decision.answer
-                }); 
+                    status: "STOPPED",
+                    message: `User requested to stop processing`
+                });
+                return "FAILURE";
+                }
+                const decision: PlanningDecision = await this.runPlanner(client, state, toolRegistry, chatMsgs);
+                console.log(JSON.stringify(decision))
+                chatMsgs.push({ "role": "user", "content": `Agent suggested me to :${decision.reasoning}` });
 
-                return "SUCCESS";
+                if (decision.type === "tool") {
+                    const result = await toolRegistry.executeTool(decision.tool_name!, decision.arguments!, client);
+                    webviewView?.webview.postMessage({
+                        type: "toolResult",
+                        tool: result.tool,
+                        arguments: result.args,
+                        result: result.result || "(no output)",
+                    });
+                    // state = updateStateWithTool(state, decision, result);
+                    state.toolResults.push(result);
+                    state.steps += 1;
+                    chatMsgs.push({ "role": "user", "content": "Executed the requested tool and added results to state" });
+                    step += 1;
+                } else if (decision.type === "final") {
+                    state.answer = decision.answer;
+                    webviewView.webview.postMessage({
+                        type: "agentDone",
+                        status: "FINISHED",
+                        message: decision.answer
+                    }); 
+
+                    return "SUCCESS";
+                }
+            } catch(e) {
+                console.log("Error in agentic loop", JSON.stringify(e));
             }
         }
 
@@ -109,11 +123,13 @@ export class GoSeekyAgent {
 
     async runPlanner(client: AIProvider, state: AgentState, toolRegistry: ToolRegistry, chatMsgs: ChatMessage[]): Promise<PlanningDecision> {
         let plannerPrompt = buildPlannerSystemPrompt(toolRegistry);
-        console.log("Planner Prompt: " + plannerPrompt);
+        let userPrompt = buildUserPrompt(state, toolRegistry);
+        // console.log("Planner Prompt: " + plannerPrompt);
+        console.log("Planner Prompt: " + userPrompt);
         let planReply = await client.chat([
             { "role": "system", "content": plannerPrompt },
             ...chatMsgs,
-            { "role": "user", "content": buildUserPrompt(state, toolRegistry) }
+            { "role": "user", "content": userPrompt }
         ]);
         console.log(planReply);
         return this.safeParseJSON(planReply, "Planner") as PlanningDecision;
@@ -124,7 +140,8 @@ export class GoSeekyAgent {
 function buildUserPrompt(state: AgentState, toolRegistry: ToolRegistry): string {
     const { query, toolResults, steps, maxSteps } = state;
 
-    const searchResults = toolResults.filter(t => t.tool === "RepoSearch");
+    console.log(toolResults);
+    const searchResults = toolResults.filter(t => t.tool === "RepoSearchTool");
     const analyzeResults = toolResults.filter(t => t.tool === "AnalyseEntityCode");
     const shellResults = toolResults.filter(t => t.tool === "ShellExecute");
 
@@ -233,18 +250,8 @@ ${analysisSummary || "None"}
 ### Execution Results (if any)
 ${shellSummary || "None"}
 
----
-
-## RULES
-
-- Do NOT analyze the same entity twice
-- Prefer analysis over repeated search
-- Avoid unnecessary shell commands
-- Use shell only if it adds real value (e.g., testing behavior, running code)
-- If enough information is available → respond
-- Assume read tools to be idempotent unless you add a write action in between. So Do not repeat read tools with same args. Look for fallbacks.
-
----
+### Prior tool results
+${JSON.stringify(toolResults)}
 
 ## Available tools
 ${toolRegistry.listToolsPrompt()}

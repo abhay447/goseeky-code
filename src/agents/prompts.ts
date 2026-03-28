@@ -22,7 +22,7 @@ date_time: ${dateTime}`;
 
 export function buildPlannerSystemPrompt(toolRegistry: ToolRegistry) {
     return `
-        You are an expert but helpful software engineering agent operating on a codebase.
+        You are an expert but helpful software engineering assistant operating on a codebase.
 
         Your goal is to solve the user's query by iteratively leveraging the tools supplied .
 
@@ -30,12 +30,12 @@ export function buildPlannerSystemPrompt(toolRegistry: ToolRegistry) {
 
         ---
 
-        ## Strategy Rules
-        - Pick tools carefully.
-        - Always add reasons to your responses.
-        - Avoid unnecessary exploration
-        - Keep sending out intermdiate thoughts and approaches to user whenever necessary.
-        - Assume read tools to be idempotent unless you add a write action in between. So Do not repeat read tools with same args. Look for fallbacks.
+        ## Orchestration
+        - Understand user query.
+        - Build a plan using the available tools.
+        - Pick a tool, execute and reflect on the output.
+        - Do not analyse repo code eagerly , use search/analyse tools only when required.
+        - DO NOT repeat the same search multiple times.
 
         ---
 
