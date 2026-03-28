@@ -8,15 +8,7 @@ import { GoSeekyAgent } from "../agents/goseekyAgent";
 
 export { AgentState };
 
-// Module-level agent instance — persists across messages to maintain conversation state
 let goSeekyAgent: MultiStepAgent | null = null;
-
-// function getAgent(): TeamLeadAgent {
-//     if (!teamLeadAgent) {
-//         teamLeadAgent = new TeamLeadAgent();
-//     }
-//     return teamLeadAgent;
-// }
 
 function getAgent(): MultiStepAgent {
     if (!goSeekyAgent) {
