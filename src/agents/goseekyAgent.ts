@@ -1,285 +1,259 @@
 import * as vscode from "vscode";
-import { AIProvider, ChatManager, ChatMessage } from "../providers";
-import { isStopped, resetStop } from "../webview/agentExecution";
-import { ToolRegistry, ToolResult } from "../tools/toolRegistry";
+import { StateGraph, END, Annotation } from "@langchain/langgraph";
+
+import { AIProvider } from "../providers";
+import { ToolRegistry } from "../tools/toolRegistry";
 import { stringToSingleJsonBlock } from "../utils/jsonUtils";
-import { buildPlannerSystemPrompt } from "./prompts";
+import { isStopped, resetStop } from "../webview/agentExecution";
+import { MultiStepAgent } from "./types";
 
-// ── Types ─────────────────────────────────────────────────────────────────────
-interface AgentState {
-    query: string;
+// ─────────────────────────────────────────
+// STATE DEFINITION
+// ─────────────────────────────────────────
+const AgentState = Annotation.Root({
+  query: Annotation<string>({ reducer: (_, b) => b, default: () => "" }),
+  messages: Annotation<any[]>({ reducer: (a, b) => [...a, ...b], default: () => [] }),
+  toolResults: Annotation<any[]>({ reducer: (a, b) => [...a, ...b], default: () => [] }),
+  steps: Annotation<number>({ reducer: (_, b) => b, default: () => 0 }),
+  maxSteps: Annotation<number>({ reducer: (_, b) => b, default: () => 20 }),
+  decision: Annotation<any>({ reducer: (_, b) => b, default: () => null }),
+  answer: Annotation<string>({ reducer: (_, b) => b, default: () => "" }),
+  agentError: Annotation<string>({ reducer: (_, b) => b, default: () => "" }),
+});
 
-    // evolving context
-    messages: ChatMessage[];
+type AgentStateType = typeof AgentState.State;
 
-    // tool outputs
-    toolResults: ToolResult[];
-
-    // control
-    steps: number;
-    maxSteps: number;
-
-    // final output
-    answer?: string;
-};
-
-interface PlanningDecision {
-    type: string;
-    tool_name?: string;
-    arguments?: Record<string, unknown>;
-
-    answer?: string;
-    reasoning: string;
-}
-
-const MAX_STEPS = 20;
-
-export class GoSeekyAgent {
-    // ChatManager held as instance variable so history persists across user messages
-    // private teamLeadChatManager: ChatManager | null = null;
-
-    private safeParseJSON(raw: string, label: string): any | null {
-        try {
-            const cleaned = stringToSingleJsonBlock(raw)!.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
-            return JSON.parse(cleaned);
-        } catch (e) {
-            let msg = `[TeamLeadAgent] Failed to parse ${label} JSON:${raw}`
-            console.error(msg);
-            throw msg;
-        }
+export class GoSeekyAgent implements MultiStepAgent {
+  clearHistory(): void {
+    // No-op since state is managed by langgraph and reset on each run.
+  }
+  // ─────────────────────────────────────────
+  // JSON SAFE PARSE
+  // ─────────────────────────────────────────
+  private safeParseJSON(raw: string): any {
+    try {
+      const cleaned = stringToSingleJsonBlock(raw)!
+        .replace(/^```(?:json)?\s*/i, "")
+        .replace(/\s*```$/, "")
+        .trim();
+      return JSON.parse(cleaned);
+    } catch {
+      return {
+        type: "final",
+        reasoning: "Fallback due to parsing failure",
+        answer: "Something went wrong. Try again.",
+      };
     }
+  }
 
-    clearHistory() {
-        // this.teamLeadChatManager?.clear();
-    }
+  // ─────────────────────────────────────────
+  // PLANNER NODE
+  // ─────────────────────────────────────────
+  private plannerNode(config: any) {
+    return async (state: AgentStateType): Promise<Partial<AgentStateType>> => {
+      const { client, toolRegistry, webviewView } = config;
 
-    async runAgenticLoop(
-        client: AIProvider,
-        userQuery: string,
-        toolRegistry: ToolRegistry,
-        context: vscode.ExtensionContext,
-        webviewView: vscode.WebviewView
-    ): Promise<string> {
-        resetStop();
+      if (isStopped()) return { answer: "STOPPED" };
 
-        let state: AgentState = {
-            query: userQuery,
-            messages: [],
-            toolResults: [],
-            steps: 0,
-            maxSteps: MAX_STEPS
-        }
-        let chatMsgs: ChatMessage[] = []
-        let step = 0;
-        while(step < MAX_STEPS){
-            try{
-                if(isStopped()){
-                    webviewView.webview.postMessage({
-                    type: "agentDone",
-                    status: "STOPPED",
-                    message: `User requested to stop processing`
-                });
-                return "FAILURE";
-                }
-                const decision: PlanningDecision = await this.runPlanner(client, state, toolRegistry, chatMsgs);
-                console.log(JSON.stringify(decision))
-                chatMsgs.push({ "role": "user", "content": `Agent suggested me to :${decision.reasoning}` });
+      let reply = "";
 
-                if (decision.type === "tool") {
-                    const result = await toolRegistry.executeTool(decision.tool_name!, decision.arguments!, client);
-                    webviewView?.webview.postMessage({
-                        type: "toolResult",
-                        tool: result.tool,
-                        arguments: result.args,
-                        result: result.result || "(no output)",
-                    });
-                    // state = updateStateWithTool(state, decision, result);
-                    state.toolResults.push(result);
-                    state.steps += 1;
-                    chatMsgs.push({ "role": "user", "content": "Executed the requested tool and added results to state" });
-                    step += 1;
-                } else if (decision.type === "final") {
-                    state.answer = decision.answer;
-                    webviewView.webview.postMessage({
-                        type: "agentDone",
-                        status: "FINISHED",
-                        message: decision.answer
-                    }); 
+      try {
+        const messages = [
+          { role: "system", content: this.buildPlannerSystemPrompt(toolRegistry) },
+          ...(state.messages || []),
+          { role: "user", content: this.buildUserPrompt(state, toolRegistry) },
+        ];
 
-                    return "SUCCESS";
-                }
-            } catch(e) {
-                console.log("Error in agentic loop", JSON.stringify(e));
-            }
-        }
+        reply = await (client as any).chat(messages);
+
+        webviewView.webview.postMessage({ type: "agentStream", content: reply });
+      } catch {
+        return { agentError: "Planner failed" };
+      }
+
+      const decision = this.safeParseJSON(reply);
+
+      return {
+        decision,
+        messages: [{ role: "assistant", content: decision.reasoning }],
+      };
+    };
+  }
+
+  // ─────────────────────────────────────────
+  // TOOL NODE
+  // ─────────────────────────────────────────
+  private toolNode(config: any) {
+    return async (state: AgentStateType): Promise<Partial<AgentStateType>> => {
+      const { client, toolRegistry, webviewView } = config;
+
+      if (isStopped()) return { answer: "STOPPED" };
+
+      try {
+        const result = await toolRegistry.executeTool(
+          state.decision.tool_name,
+          state.decision.arguments,
+          client
+        );
 
         webviewView.webview.postMessage({
-            type: "agentDone",
-            status: "MAX_ITERATIONS",
-            message: `Could not complete task in ${MAX_STEPS} planning iterations.`
+          type: "toolResult",
+          tool: result.tool,
+          arguments: result.args,
+          result: result.result || "(no output)",
         });
-        return "FAILURE";
+
+        return {
+          toolResults: [result],
+          steps: (state.steps || 0) + 1,
+        };
+      } catch (e: any) {
+        return {
+          agentError: e?.message || "Tool failed",
+          steps: (state.steps || 0) + 1,
+        };
+      }
+    };
+  }
+
+  // ─────────────────────────────────────────
+  // FINAL NODE
+  // ─────────────────────────────────────────
+  private finalNode(config: any) {
+    return async (state: AgentStateType): Promise<Partial<AgentStateType>> => {
+      const { webviewView } = config;
+      const answer = state.decision?.answer || state.answer;
+
+      webviewView.webview.postMessage({
+        type: "agentDone",
+        status: "FINISHED",
+        message: answer,
+      });
+
+      return { answer };
+    };
+  }
+
+  // ─────────────────────────────────────────
+  // ERROR HANDLER NODE
+  // ─────────────────────────────────────────
+  private errorHandlerNode(config: any) {
+    return async (state: AgentStateType): Promise<Partial<AgentStateType>> => {
+      const { webviewView } = config;
+
+      webviewView.webview.postMessage({
+        type: "agentDone",
+        status: "ERROR",
+        message: state.agentError,
+      });
+
+      return { answer: state.agentError };
+    };
+  }
+
+  // ─────────────────────────────────────────
+  // ROUTER
+  // ─────────────────────────────────────────
+  private router(state: AgentStateType): string {
+    if (state.agentError) return "errorHandler";
+    if ((state.steps || 0) >= (state.maxSteps || 20)) return "__end__";
+    if (state.decision?.type === "final") return "final";
+    return "tool";
+  }
+
+  // ─────────────────────────────────────────
+  // GRAPH
+  // ─────────────────────────────────────────
+  private createGraph(config: any) {
+    const graph = new StateGraph(AgentState)
+      .addNode("planner", this.plannerNode(config))
+      .addNode("tool", this.toolNode(config))
+      .addNode("final", this.finalNode(config))
+      .addNode("errorHandler", this.errorHandlerNode(config))
+      .addEdge("__start__", "planner")
+      .addConditionalEdges("planner", this.router.bind(this), {
+        tool: "tool",
+        final: "final",
+        errorHandler: "errorHandler",
+        __end__: END,
+      })
+      .addEdge("tool", "planner")
+      .addEdge("final", "__end__")
+      .addEdge("errorHandler", "__end__");
+
+    return graph.compile();
+  }
+
+  // ─────────────────────────────────────────
+  // RUNNER
+  // ─────────────────────────────────────────
+  async runAgenticLoop(
+    client: AIProvider,
+    userQuery: string,
+    toolRegistry: ToolRegistry,
+    context: vscode.ExtensionContext,
+    webviewView: vscode.WebviewView
+  ): Promise<string> {
+    resetStop();
+
+    const graph = this.createGraph({ client, toolRegistry, context, webviewView });
+
+    const result = await graph.invoke({
+      query: userQuery,
+      messages: [],
+      toolResults: [],
+      steps: 0,
+      maxSteps: 20,
+    });
+
+    if (typeof result?.answer === "string" && result.answer) {
+      return result.answer;
     }
+    console.log(JSON.stringify(result))
 
-    async runPlanner(client: AIProvider, state: AgentState, toolRegistry: ToolRegistry, chatMsgs: ChatMessage[]): Promise<PlanningDecision> {
-        let plannerPrompt = buildPlannerSystemPrompt(toolRegistry);
-        let userPrompt = buildUserPrompt(state, toolRegistry);
-        // console.log("Planner Prompt: " + plannerPrompt);
-        console.log("Planner Prompt: " + userPrompt);
-        let planReply = await client.chat([
-            { "role": "system", "content": plannerPrompt },
-            ...chatMsgs,
-            { "role": "user", "content": userPrompt }
-        ]);
-        console.log(planReply);
-        return this.safeParseJSON(planReply, "Planner") as PlanningDecision;
+    webviewView.webview.postMessage({
+      type: "agentDone",
+      status: "MAX_ITERATIONS",
+      message: "Could not complete task",
+    });
 
-    }
-}
+    return "FAILURE";
+  }
 
-function buildUserPrompt(state: AgentState, toolRegistry: ToolRegistry): string {
-    const { query, toolResults, steps, maxSteps } = state;
-
-    console.log(toolResults);
-    const searchResults = toolResults.filter(t => t.tool === "RepoSearchTool");
-    const analyzeResults = toolResults.filter(t => t.tool === "AnalyseEntityCode");
-    const shellResults = toolResults.filter(t => t.tool === "ShellExecute");
-
-    // --- Visited entities ---
-    const visitedEntities = new Set<string>();
-    for (const t of analyzeResults) {
-        try {
-            const args = JSON.parse(t.args);
-            if (args.entityId) visitedEntities.add(args.entityId);
-        } catch { }
-    }
-
-    // --- Candidates from search ---
-    const candidates: { id: string; reason?: string }[] = [];
-    for (const t of searchResults.slice(-2)) {
-        try {
-            const parsed = JSON.parse(t.result);
-            for (const item of parsed.slice(0, 5)) {
-                if (!visitedEntities.has(item.id)) {
-                    candidates.push({
-                        id: item.id,
-                        reason: item.description || item.name || ""
-                    });
-                }
-            }
-        } catch { }
-    }
-
-    const uniqueCandidates = Array.from(
-        new Map(candidates.map(c => [c.id, c])).values()
-    ).slice(0, 5);
-
-    // --- Analysis summary ---
-    const analysisSummary = analyzeResults
-        .slice(-3)
-        .map(t => {
-            try {
-                const args = JSON.parse(t.args);
-                return `- ${args.entityId}: ${t.result.slice(0, 200)}`;
-            } catch {
-                return "";
-            }
-        })
-        .filter(Boolean)
-        .join("\n");
-
-    // --- Shell summary ---
-    const shellSummary = shellResults
-        .slice(-2)
-        .map(t => `- Command: ${t.args}\n  Output: ${t.result.slice(0, 200)}`)
-        .join("\n");
-
-    // --- Search summary ---
-    const searchSummary = searchResults
-        .slice(-1)
-        .map(t => {
-            try {
-                const parsed = JSON.parse(t.result);
-                return parsed
-                    .slice(0, 5)
-                    .map((r: any) => `- ${r.id}: ${r.description || ""}`)
-                    .join("\n");
-            } catch {
-                return "";
-            }
-        })
-        .join("\n");
-
+  // ─────────────────────────────────────────
+  // PROMPTS
+  // ─────────────────────────────────────────
+  private buildUserPrompt(state: AgentStateType, toolRegistry: ToolRegistry) {
     return `
-## TASK
-Solve the following query using the available tools.
-
 Query:
-${query}
+${state.query}
 
----
+Steps: ${state.steps || 0}
 
-## CURRENT STATE
+Tool Results:
+${JSON.stringify(state.toolResults || [])}
 
-Steps Taken: ${steps}/${maxSteps}
-
----
-
-### Visited Entities (DO NOT REVISIT)
-${[...visitedEntities].join("\n") || "None"}
-
----
-
-### Candidate Entities (Next Best Options)
-${uniqueCandidates
-            .map(c => `- ${c.id}${c.reason ? `: ${c.reason}` : ""}`)
-            .join("\n") || "None"}
-
----
-
-### Recent Search Results
-${searchSummary || "None"}
-
----
-
-### Code Understanding So Far
-${analysisSummary || "None"}
-
----
-
-### Execution Results (if any)
-${shellSummary || "None"}
-
-### Prior tool results
-${JSON.stringify(toolResults)}
-
-## Available tools
+Tools:
 ${toolRegistry.listToolsPrompt()}
 
----
-
-## Output format (STRICT JSON ONLY)
-
-{
-    "type": "tool" | "final",
-    "reasoning": "<REQUIRED: explain why this step is chosen>",
-    "tool_name" : <tool_name selected from "Available tools", required if "type" is "tool">,
-    "arguments" : {ARGUMENTS_JSON as per Argument schema definition for the tool in "Available tools", should be valid json, required if "type" is "tool"}
-
-    // if type = final
-    "answer": string,
-}
-
-* If type=tool then always include tool_name and arguments.
-* arguments should AWLAYS BE  as per Argument schema definition for the tool in "Available tools".
-* Your response will be rejected if:
-    - reasoning is missing when
-    - reasoning is empty
-    - reasoning is shorter than 10 words
-    - tool_name is not correct.
-    - arguments DO NOT Match prescribed SCHEMA.
-    - answer is missing and type is final.
-
-* DO NOT REPLY ANYTHING other than JSON.
+STRICT JSON ONLY.
 `;
+  }
+
+  private buildPlannerSystemPrompt(toolRegistry: ToolRegistry) {
+    return `
+You are an expert agent.
+
+${toolRegistry.listToolsPrompt()}
+
+Return JSON:
+{
+  "type": "tool" | "final",
+  "reasoning": "...",
+  "tool_name": "...",
+  "arguments": {},
+  "answer": "..."
+}
+`;
+  }
 }

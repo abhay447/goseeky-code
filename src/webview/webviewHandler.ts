@@ -4,13 +4,14 @@ import { AgentState, applyEdit, createFile, switchProvider, requestStop } from "
 import { TeamLeadAgent } from "../agents/teamlead";
 import { runShell } from "../utils/shellUtils";
 import { ToolRegistry } from "../tools/toolRegistry";
+import { MultiStepAgent } from "../agents/types";
 import { GoSeekyAgent } from "../agents/goseekyAgent";
 
 export { AgentState };
 
 // Module-level agent instance — persists across messages to maintain conversation state
 let teamLeadAgent: TeamLeadAgent | null = null;
-let goSeekyAgent: GoSeekyAgent | null = null;
+let goSeekyAgent: MultiStepAgent | null = null;
 
 // function getAgent(): TeamLeadAgent {
 //     if (!teamLeadAgent) {
@@ -19,7 +20,7 @@ let goSeekyAgent: GoSeekyAgent | null = null;
 //     return teamLeadAgent;
 // }
 
-function getAgent(): GoSeekyAgent {
+function getAgent(): MultiStepAgent {
     if (!goSeekyAgent) {
         goSeekyAgent = new GoSeekyAgent();
     }
