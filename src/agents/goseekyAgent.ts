@@ -66,7 +66,7 @@ export class GoSeekyAgent implements MultiStepAgent {
 
         reply = await (client as any).chat(messages);
 
-        webviewView.webview.postMessage({ type: "agentStream", content: reply });
+        webviewView.webview.postMessage({ type: "agentGoal", content: reply });
       } catch {
         return { agentError: "Planner failed" };
       }
@@ -109,7 +109,7 @@ export class GoSeekyAgent implements MultiStepAgent {
         };
       } catch (e: any) {
         return {
-          agentError: e?.message || "Tool failed",
+          agentError: e?.stack || "Tool failed",
           steps: (state.steps || 0) + 1,
         };
       }

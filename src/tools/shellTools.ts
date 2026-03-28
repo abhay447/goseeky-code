@@ -22,4 +22,7 @@ export class ShellExecute implements AgentTool {
     return JSON.stringify(result)
   }
 
+    shouldSummariseResult(): boolean {
+    return false;
+  }
 }

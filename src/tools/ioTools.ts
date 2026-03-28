@@ -20,4 +20,8 @@ export class SendToUser implements AgentTool {
     return (input.message as string);
   }
 
+    shouldSummariseResult(): boolean {
+    return false;
+  }
+
 }

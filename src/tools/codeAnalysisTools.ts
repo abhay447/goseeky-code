@@ -23,7 +23,9 @@ export class RepoSearch implements AgentTool {
     // console.log("Search results" + result);
     return JSON.stringify(result);
   }
-
+  shouldSummariseResult(): boolean {
+    return false;
+  }
 }
 
 export class GetEntityCode implements AgentTool {
@@ -41,6 +43,10 @@ export class GetEntityCode implements AgentTool {
     return await extractEntityCode(input.entity_id as string, this.hybridStore);
   }
 
+  shouldSummariseResult(): boolean {
+    return true;
+  }
+
 }
 
 export class AnalyseEntityCode implements AgentTool {
@@ -53,7 +59,10 @@ export class AnalyseEntityCode implements AgentTool {
     this.hybridStore = hybridStore;
     this.name = `AnalyseEntity`;
     this.toolDescription = "Allows Q&A and natural language analysis of entity by analysing entity code. Argument Schema: {\"entity_id\" : <entity id from RepoSearchTool>, \"analysis_prompt\" : <user supplied prompt on how they want to analyse the code>}";
+  }
 
+  shouldSummariseResult(): boolean {
+    return false;
   }
   isIntelligentTool(): boolean {
     return true;

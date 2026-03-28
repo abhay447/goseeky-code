@@ -346,7 +346,7 @@
             if (msg.type === 'agentGoal') {
                 const card = document.createElement('div');
                 card.className = 'card goal';
-                card.innerHTML = '<div class="card-title">🎯 Goal</div><div>' + escapeHtml(msg.goal) + '</div>';
+                card.innerHTML = '<div class="card-title">🎯 Goal</div><div>' + escapeHtml(msg.content) + '</div>';
                 appendToIteration(card);
             }
 
