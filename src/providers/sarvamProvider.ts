@@ -4,7 +4,7 @@ import { AIProvider, ChatMessage, ChatOptions } from "./types";
 export class SarvamProvider implements AIProvider {
   name = "sarvam";
   private readonly baseUrl = "api.sarvam.ai";
-  private readonly model = "sarvam-30b";
+  private readonly model = "sarvam-105b";
 
   constructor(private apiKey: string) {}
 
@@ -41,6 +41,8 @@ export class SarvamProvider implements AIProvider {
               const parsed = JSON.parse(data);
               resolve(parsed.choices[0].message.content);
             } catch (e) {
+              console.log("Sarvam Client failed with error ",e)
+              console.log(data)
               reject(new Error(`Failed to parse response: ${data}`));
             }
           });

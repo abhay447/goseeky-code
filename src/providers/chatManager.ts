@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import { AIProvider, ChatMessage, ChatOptions } from "./types";
+import { stringToSingleJsonBlock } from "../utils/jsonUtils";
 
 const MAX_TOKENS = 9000;
 const MAX_MESSAGES = MAX_TOKENS / 300;
@@ -90,27 +91,78 @@ export class ChatManager {
     return [safeSystemMsg, ...trimmed, safeUserMsg];
   }
 
-  async chat(
-    client: AIProvider,
-    systemMsg: ChatMessage,
-    userMsg: ChatMessage,
-    options?: ChatOptions
-  ): Promise<string> {
-    const messages = this.getHistory(systemMsg, userMsg);
-    console.log("messages : " + JSON.stringify(messages))
-    const rawReply = await client.chat(messages, options);
-    console.log("raw reply:", rawReply);
-    const reply = stripThinkingBlocks(rawReply);
+async chat(
+  client: AIProvider,
+  systemMsg: ChatMessage,
+  userMsg: ChatMessage,
+  options?: ChatOptions
+): Promise<string> {
+  const messages = this.getHistory(systemMsg, userMsg);
+  console.log("messages:", JSON.stringify(messages));
 
-    this.history.push(userMsg);
-    this.history.push({ role: "assistant", content: reply });
+  let rawReply = "";
+  let lastError: any;
 
-    await this.context.globalState.update(this.storageKey, this.history);
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      console.log(`Attempt ${attempt}...`);
 
-    return reply;
+      rawReply = await client.chat(messages, options);
+      console.log("raw reply:", rawReply);
+
+      const cleaned = stringToSingleJsonBlock(stripThinkingBlocks(rawReply));
+
+      // 🔴 Check conditions
+      if (!cleaned || cleaned.trim().length === 0) {
+        throw new Error("Empty response");
+      }
+
+      if (!isValidJSON(cleaned)) {
+        throw new Error("Response is not valid JSON");
+      }
+
+      // ✅ success
+      this.history.push(userMsg);
+      this.history.push({ role: "assistant", content: cleaned });
+
+      await this.context.globalState.update(this.storageKey, this.history);
+
+      return cleaned;
+
+    } catch (err) {
+      lastError = err;
+      console.warn(`Attempt ${attempt} failed:`, err);
+
+      if (attempt < 3) {
+        console.log("Retrying in 3 seconds...");
+        await sleep(3000);
+      }
+    }
   }
+
+  // ❌ all retries failed
+  throw new Error(
+    `Failed after 3 attempts. Last error: ${lastError?.message || lastError}`
+  );
+}
+
 
   size(): number {
     return this.history.length;
   }
+}
+
+function isValidJSON(str: string): boolean {
+  if (!str || typeof str !== "string") return false;
+
+  try {
+    JSON.parse(str);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
