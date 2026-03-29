@@ -70,7 +70,7 @@ export class ToolRegistry {
         let tool = this.toolsMap.get(toolName)!;
         tool.setAiProvider(client);
         let result = await tool.execute(args);
-        if(result && result.length > 5000 || tool.shouldSummariseResult()) {
+        if(result && result.length > 5000 && tool.shouldSummariseResult()) {
             result = await this.summariseToolResult(client, toolName, JSON.stringify(args), reason, goal,result);
         }
         console.log(`tool : ${tool}, result: ${result}`);

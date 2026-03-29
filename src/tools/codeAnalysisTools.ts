@@ -14,6 +14,9 @@ export class RepoSearch implements AgentTool {
       Use this tool to discover enttites obtained by parsing source code and their relationships. 
       This tool doesn't expose and see source code, for analysing source code you should use : AnalyseEntity .
       DO NOT repeat calls to this tool with same arguments, if something got missed during code parsing and does not appear in search results then you should fallback to ShellExecute tool. 
+      This tool works on best effort AST parsing of code and may not cover the entire codebase or may miss some relationships.
+      Thus if satisfactory results are not obtained from this tool then use ShellExecute tool to find relevant code sections using grep/find/glob/cat etc..
+
       Argument Schema: {\"query\" : <string_to_search>}`
   }
 
@@ -35,7 +38,10 @@ export class GetEntityCode implements AgentTool {
   constructor(hybridStore: HybridStore) {
     this.hybridStore = hybridStore;
     this.name = `GetEntityCode`;
-    this.toolDescription = "Reads source for the entity_id requested. Argument Schema: {\"entity_id\" : <entity id from RepoSearchTool whose code is required>}";
+    this.toolDescription = `
+    Reads source for the entity_id requested. 
+    This tool cannot be called without RepoSearchTool which is used to obtain entity ids.
+    Argument Schema: {\"entity_id\" : <entity id from RepoSearchTool whose code is required>}`;
 
   }
   setAiProvider(client: AIProvider) {}
@@ -58,7 +64,10 @@ export class AnalyseEntityCode implements AgentTool {
   constructor(hybridStore: HybridStore) {
     this.hybridStore = hybridStore;
     this.name = `AnalyseEntity`;
-    this.toolDescription = "Allows Q&A and natural language analysis of entity by analysing entity code. Argument Schema: {\"entity_id\" : <entity id from RepoSearchTool>, \"analysis_prompt\" : <user supplied prompt on how they want to analyse the code>}";
+    this.toolDescription = `
+    Allows Q&A and natural language analysis of entity by analysing entity code. 
+    This tool cannot be called without RepoSearchTool which is used to obtain entity ids.
+    Argument Schema: {\"entity_id\" : <entity id from RepoSearchTool>, \"analysis_prompt\" : <user supplied prompt on how they want to analyse the code>}`;
   }
 
   shouldSummariseResult(): boolean {
