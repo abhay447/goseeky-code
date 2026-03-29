@@ -5,21 +5,22 @@ import { runShell } from "../utils/shellUtils";
 import { ToolRegistry } from "../tools/toolRegistry";
 import { MultiStepAgent } from "../agents/types";
 import { GoSeekyAgent } from "../agents/goseekyAgent";
+import { ChatHistoryManager } from "../providers/chatHistoryManager";
 
 export { AgentState };
 
 let goSeekyAgent: MultiStepAgent | null = null;
 
-function getAgent(): MultiStepAgent {
+function getAgent(chatHistoryManager: ChatHistoryManager): MultiStepAgent {
     if (!goSeekyAgent) {
-        goSeekyAgent = new GoSeekyAgent();
+        goSeekyAgent = new GoSeekyAgent(chatHistoryManager);
     }
     return goSeekyAgent;
 }
 
 export async function handleAgentMessage(
     state: AgentState,
-    chatManager: ChatManager,
+    chatHistoryManager: ChatHistoryManager,
     toolRegistry: ToolRegistry,
     context: vscode.ExtensionContext,
     lastActiveEditor: vscode.TextEditor | undefined,
@@ -27,7 +28,7 @@ export async function handleAgentMessage(
     msg: any
 ) {
     if (msg.type === "switchProvider") {
-        await switchProvider(state, chatManager, context, webviewView);
+        await switchProvider(state, context, webviewView);
     }
 
     if (msg.type === "ask") {
@@ -35,7 +36,7 @@ export async function handleAgentMessage(
             webviewView.webview.postMessage({ type: "error", text: "No API key set. Run 'Goseeky: Set API Key'." });
             return;
         }
-        await getAgent().runAgenticLoop(state.activeProvider, msg.text, toolRegistry, context, webviewView);
+        await getAgent(chatHistoryManager).runAgenticLoop(state.activeProvider, msg.text, toolRegistry, context, webviewView);
     }
 
     if (msg.type === "stopAgent") {
@@ -83,8 +84,8 @@ export async function handleAgentMessage(
 
     if (msg.type === "clearHistory") {
         // Clear both the passed-in chatManager and the agent's internal history
-        chatManager.clear();
-        getAgent().clearHistory();
+        // chatHistoryManager.clear();
+        getAgent(chatHistoryManager).clearHistory();
         webviewView.webview.postMessage({ type: "historyCleared" });
     }
 }

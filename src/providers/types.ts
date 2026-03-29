@@ -12,3 +12,9 @@ export interface AIProvider {
   name: string;
   chat(messages: ChatMessage[], options?: ChatOptions): Promise<string>;
 }
+
+export interface ChatHistoryRecord {
+  userQuery: string;
+  agentResponse: string;
+  timestamp?: number;
+}

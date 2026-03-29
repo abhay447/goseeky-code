@@ -191,176 +191,6 @@ function formatResultsForAI(results: CommandResult[]): string {
     }).join("\n---\n");
 }
 
-// ── Agentic loop ──────────────────────────────────────────────────────────────
-export async function runAgenticLoop(
-    state: AgentState,
-    chatManager: ChatManager,
-    userText: string,
-    temperature: number,
-    webviewView: vscode.WebviewView
-): Promise<void> {
-    stopRequested = false;
-    const MAX_ITERATIONS = 100;
-    let iteration = 0;
-    let accumulatedResults: CommandResult[] = [];
-    let goalShown = false;
-    let lastCommandSignature = "";
-    let repeatedCommandCount = 0;
-    const executedCommands = new Set<string>(); // track all commands run so far
-
-    while (iteration < MAX_ITERATIONS) {
-        iteration++;
-
-        if (stopRequested) {
-            webviewView.webview.postMessage({ type: "agentDone", status: "STOPPED" });
-            return;
-        }
-
-        webviewView.webview.postMessage({ type: "agentIteration", iteration, max: MAX_ITERATIONS });
-
-        const systemPrompt = buildSystemPrompt();
-        const attemptsLeft = MAX_ITERATIONS - iteration;
-
-        const alreadyRun = accumulatedResults.map(r => r.command);
-        console.log("alreadyRun" + alreadyRun);
-        const userMessage = accumulatedResults.length === 0
-            ? userText
-            : `Original goal: ${userText}\n\nCommands already executed (DO NOT repeat these):\n${alreadyRun.map(c => `- ${c}`).join("\n")}\n\nResults:\n${formatResultsForAI(accumulatedResults)}\n\nAttempts remaining: ${attemptsLeft}. Continue with NEW commands only. If the goal is achieved or cannot be achieved, set status to FINISHED or ABORTED.`;
-        console.log(userMessage)
-        let reply: string;
-        try {
-            reply = await chatManager.chat(
-                state.activeProvider!,
-                { role: "system", content: systemPrompt },
-                { role: "user", content: userMessage },
-                { temperature }
-            );
-        } catch (e: any) {
-            webviewView.webview.postMessage({ type: "error", text: e.message });
-            return;
-        }
-
-        if (stopRequested) {
-            webviewView.webview.postMessage({ type: "agentDone", status: "STOPPED" });
-            return;
-        }
-
-        const parsed = parseAgentResponse(reply);
-
-        // Show goal once
-        if (!goalShown && parsed.goal) {
-            webviewView.webview.postMessage({ type: "agentGoal", goal: parsed.goal });
-            goalShown = true;
-        }
-
-        // Show explanation text — prefer text before <response>, fall back to inside
-        const firstResponseIdx = reply.indexOf("<response>");
-        const lastResponseEnd = reply.lastIndexOf("</response>");
-        const outsideResponse = firstResponseIdx !== -1
-            ? reply.slice(0, firstResponseIdx).trim()
-            : "";
-
-        // Extract full inner content of all <response> blocks, strip XML tags, show as text
-        const insideResponse = (firstResponseIdx !== -1 && lastResponseEnd !== -1)
-            ? reply.slice(firstResponseIdx, lastResponseEnd + "</response>".length)
-                .replace(/<\/?response>/g, "")
-                .replace(/<goal>[\s\S]*?<\/goal>/g, "")
-                .replace(/<stage>[\s\S]*?<\/stage>/g, "")
-                .replace(/<status>[\s\S]*?<\/status>/g, "")
-                .replace(/<sub-goals>[\s\S]*?<\/sub-goals>/g, "")
-                .replace(/<sub-goal>[\s\S]*?<\/sub-goal>/g, "")
-                .replace(/<commands>[\s\S]*?<\/commands>/g, "")
-                .replace(/<run-shell>[\s\S]*?<\/run-shell>/g, "")
-                .replace(/<title>[\s\S]*?<\/title>/g, "")
-                .trim()
-            : "";
-
-        const displayText = outsideResponse || insideResponse;
-        if (displayText) {
-            webviewView.webview.postMessage({ type: "reply", text: displayText });
-        }
-
-        const hasCommands = parsed.subGoals.some(sg => sg.commands.length > 0);
-        const terminalStatus = ["FINISHED", "COMPLETED", "ABORTED", "TERMINATED"].includes(parsed.status.toUpperCase());
-
-        // If model omitted top-level <status> but all sub-goals are done, treat as terminal
-        const allSubGoalsDone = parsed.subGoals.length > 0 &&
-            parsed.subGoals.every(sg =>
-                ["FINISHED", "COMPLETED", "ABORTED", "TERMINATED"].includes(sg.status.toUpperCase())
-            );
-        const effectivelyDone = terminalStatus || (allSubGoalsDone && !hasCommands);
-
-        if (!hasCommands && !effectivelyDone && !displayText && parsed.goal) {
-            webviewView.webview.postMessage({ type: "reply", text: parsed.goal });
-        }
-
-        if (hasCommands) {
-            // Detect repeated commands — if same set of commands runs twice, break
-            const currentSignature = parsed.subGoals
-                .flatMap(sg => sg.commands)
-                .join("|");
-
-            // Check if ALL commands in this batch have already been run
-            const allCommandsAlreadyRun = parsed.subGoals
-                .flatMap(sg => sg.commands)
-                .every(cmd => executedCommands.has(cmd.trim()));
-
-            if (allCommandsAlreadyRun) {
-                repeatedCommandCount++;
-                if (repeatedCommandCount >= 3) {
-                    webviewView.webview.postMessage({
-                        type: "agentDone",
-                        status: "ABORTED",
-                        message: "Stuck in a loop — same commands repeated. Try rephrasing your request."
-                    });
-                    return;
-                }
-            } else {
-                repeatedCommandCount = 0;
-            }
-            lastCommandSignature = currentSignature;
-
-            const newResults = await executeSubGoals(parsed.subGoals, webviewView, alreadyRun);
-            // Track all executed commands
-            parsed.subGoals.flatMap(sg => sg.commands).forEach(cmd => executedCommands.add(cmd.trim()));
-            accumulatedResults = [...accumulatedResults, ...newResults]; // append, not replace
-
-            if (stopRequested) {
-                webviewView.webview.postMessage({ type: "agentDone", status: "STOPPED" });
-                return;
-            }
-        }
-
-        if (effectivelyDone) {
-            const finalStatus = terminalStatus ? parsed.status.toUpperCase() : "FINISHED";
-            // If nothing was shown as a reply yet, summarize the last results
-            if (!displayText && accumulatedResults.length > 0) {
-                const summary = accumulatedResults
-                    .map(r => r.error ? `Error: ${r.error}` : r.stdout && r.stdout !== "(no output)" ? r.stdout.trim() : "")
-                    .filter(Boolean)
-                    .join("\n");
-                if (summary) {
-                    webviewView.webview.postMessage({ type: "reply", text: summary });
-                }
-            }
-            webviewView.webview.postMessage({ type: "agentDone", status: finalStatus });
-            return;
-        }
-
-        // If no commands and not done — treat as finished
-        if (!hasCommands) {
-            webviewView.webview.postMessage({ type: "agentDone", status: "FINISHED" });
-            return;
-        }
-    }
-
-    webviewView.webview.postMessage({
-        type: "agentDone",
-        status: "MAX_ITERATIONS",
-        message: `Reached max iterations (${MAX_ITERATIONS}). Review results above.`
-    });
-}
-
 // ── Apply edit to file ────────────────────────────────────────────────────────
 export async function applyEdit(
     code: string,
@@ -423,7 +253,6 @@ export async function createFile(
 // ── Switch provider ───────────────────────────────────────────────────────────
 export async function switchProvider(
     state: AgentState,
-    chatManager: ChatManager,
     context: vscode.ExtensionContext,
     webviewView: vscode.WebviewView
 ): Promise<void> {
@@ -440,7 +269,6 @@ export async function switchProvider(
     }
     state.activeProviderName = pick.id as "sarvam" | "gemini";
     state.activeProvider = pick.id === "sarvam" ? new SarvamProvider(key) : new GeminiProvider(key);
-    chatManager.clear();
     webviewView.webview.postMessage({ type: "providerChanged", provider: state.activeProviderName });
     vscode.window.showInformationMessage(`Switched to ${pick.id} — history cleared`);
 }

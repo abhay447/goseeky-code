@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
-import { AIProvider, SarvamProvider, GeminiProvider, ChatManager } from "./providers";
+import { SarvamProvider, GeminiProvider, ChatManager } from "./providers";
 import { AgentState, handleAgentMessage } from "./webview/webviewHandler";
 import { indexRepo } from "./core/search/indexer";
 import { ToolRegistry } from "./tools/toolRegistry";
@@ -153,15 +153,15 @@ state.activeProvider = pick.id === "sarvam"
       await vscode.window.withProgress(
         { location: vscode.ProgressLocation.Notification, title: "Goseeky AI is thinking..." },
         async () => {
-          const answer = await chatManager.chat(client,
-            { role: "system", content: "You are a helpful coding assistant. Be concise." },
-            { role: "user", content: question }
-          );
-          const doc = await vscode.workspace.openTextDocument({
-            content: `# Goseeky AI Response\n\n**Question:** ${question}\n\n---\n\n${answer}`,
-            language: "markdown"
-          });
-          vscode.window.showTextDocument(doc);
+          // const answer = await chatManager.chat(client,
+          //   { role: "system", content: "You are a helpful coding assistant. Be concise." },
+          //   { role: "user", content: question }
+          // );
+          // const doc = await vscode.workspace.openTextDocument({
+          //   content: `# Goseeky AI Response\n\n**Question:** ${question}\n\n---\n\n${answer}`,
+          //   language: "markdown"
+          // });
+          // vscode.window.showTextDocument(doc);
         }
       );
     })
@@ -193,21 +193,21 @@ state.activeProvider = pick.id === "sarvam"
       await vscode.window.withProgress(
         { location: vscode.ProgressLocation.Notification, title: "Explaining code..." },
         async () => {
-          const explanation = await chatManager.chat(client,
-            {
-              role: "system",
-              content: "You are a code explainer. Explain the given code clearly with a line-by-line breakdown if needed."
-            },
-            {
-              role: "user",
-              content: `Explain this ${lang} code:\n\`\`\`${lang}\n${code}\n\`\`\``
-            }
-          );
-          const doc = await vscode.workspace.openTextDocument({
-            content: `# Code Explanation\n\n\`\`\`${lang}\n${code}\n\`\`\`\n\n---\n\n${explanation}`,
-            language: "markdown"
-          });
-          vscode.window.showTextDocument(doc, vscode.ViewColumn.Beside);
+          // const explanation = await chatManager.chat(client,
+          //   {
+          //     role: "system",
+          //     content: "You are a code explainer. Explain the given code clearly with a line-by-line breakdown if needed."
+          //   },
+          //   {
+          //     role: "user",
+          //     content: `Explain this ${lang} code:\n\`\`\`${lang}\n${code}\n\`\`\``
+          //   }
+          // );
+          // const doc = await vscode.workspace.openTextDocument({
+          //   content: `# Code Explanation\n\n\`\`\`${lang}\n${code}\n\`\`\`\n\n---\n\n${explanation}`,
+          //   language: "markdown"
+          // });
+          // vscode.window.showTextDocument(doc, vscode.ViewColumn.Beside);
         }
       );
     })
