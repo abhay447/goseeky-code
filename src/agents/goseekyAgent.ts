@@ -37,7 +37,8 @@ export class GoSeekyAgent implements MultiStepAgent {
         .replace(/\s*```$/, "")
         .trim();
       return JSON.parse(cleaned);
-    } catch {
+    } catch(err) {
+      console.error("JSON parsing error:", err, "Raw input:", raw);
       return {
         type: "final",
         reasoning: "Fallback due to parsing failure",
@@ -93,6 +94,8 @@ export class GoSeekyAgent implements MultiStepAgent {
         const result = await toolRegistry.executeTool(
           state.decision.tool_name,
           state.decision.arguments,
+          state.decision.reasoning,
+          state.query,
           client
         );
 
@@ -205,16 +208,25 @@ export class GoSeekyAgent implements MultiStepAgent {
       steps: 0,
       maxSteps: 20,
     });
-
+    console.log(JSON.stringify(result))
     if (typeof result?.answer === "string" && result.answer) {
       return result.answer;
     }
-    console.log(JSON.stringify(result))
+    // console.log(JSON.stringify(result))
+    if(result.steps >= result.maxSteps) {
+      webviewView.webview.postMessage({
+        type: "agentDone",
+        status: "MAX_ITERATIONS",
+        message: "Could not complete task within step limit.",
+      });
+      return "FAILURE";
+    }
 
+    console.log("Final agent result", result);
     webviewView.webview.postMessage({
-      type: "agentDone",
-      status: "MAX_ITERATIONS",
-      message: "Could not complete task",
+      type: "error",
+      status: "FAILURE",
+      text: "Could not complete task",
     });
 
     return "FAILURE";
@@ -246,11 +258,11 @@ You are an expert agent.
 
 ${toolRegistry.listToolsPrompt()}
 
-Return JSON:
+ALWAYS RETURN A JSON IN THIS FORMAT:
 {
-  "type": "tool" | "final",
+  "type": "tool" | "final", // use final if you want to return the answer to the user and no tool calls are pending. DO NOT SendToUser with final since incase of final only answer and reasoning is expected, tool_name and arguments will be ignored by the system.
   "reasoning": "...",
-  "tool_name": "...",
+  "tool_name": "...", // only when type is "tool".
   "arguments": {},
   "answer": "..."
 }

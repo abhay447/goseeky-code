@@ -49,11 +49,34 @@
             word-wrap: break-word;
         }
 
-        .user { background: var(--vscode-input-background); text-align: right; }
-        .user.queued { opacity: 0.5; font-style: italic; }
-        .assistant { background: var(--vscode-editor-inactiveSelectionBackground); white-space: normal; }
-        .error { color: var(--vscode-errorForeground); background: var(--vscode-inputValidation-errorBackground); padding: 6px 8px; border-radius: 4px; }
-        .system { color: var(--vscode-descriptionForeground); font-style: italic; font-size: 11px; text-align: center; }
+        .user {
+            background: var(--vscode-input-background);
+            text-align: right;
+        }
+
+        .user.queued {
+            opacity: 0.5;
+            font-style: italic;
+        }
+
+        .assistant {
+            background: var(--vscode-editor-inactiveSelectionBackground);
+            white-space: normal;
+        }
+
+        .error {
+            color: var(--vscode-errorForeground);
+            background: var(--vscode-inputValidation-errorBackground);
+            padding: 6px 8px;
+            border-radius: 4px;
+        }
+
+        .system {
+            color: var(--vscode-descriptionForeground);
+            font-style: italic;
+            font-size: 11px;
+            text-align: center;
+        }
 
         .card {
             margin: 6px 0;
@@ -62,21 +85,68 @@
             background: var(--vscode-editor-inactiveSelectionBackground);
             border-left: 3px solid var(--vscode-activityBarBadge-background);
         }
-        .card-title { font-size: 11px; font-weight: bold; margin-bottom: 4px; }
-        .card.goal { border-left-color: #569cd6; }
-        .card.goal .card-title { color: #569cd6; }
-        .card.subgoal { border-left-color: #9cdcfe; }
-        .card.subgoal .card-title { color: #9cdcfe; }
-        .card.running { border-left-color: #dcdcaa; }
-        .card.running .card-title { color: #dcdcaa; }
-        .card.result { border-left-color: #4ec9b0; }
-        .card.result .card-title { color: #4ec9b0; }
-        .card.done-finished { border-left-color: #4ec9b0; }
-        .card.done-finished .card-title { color: #4ec9b0; }
-        .card.done-aborted { border-left-color: var(--vscode-errorForeground); }
-        .card.done-aborted .card-title { color: var(--vscode-errorForeground); }
-        .card.done-max { border-left-color: #dcdcaa; }
-        .card.done-max .card-title { color: #dcdcaa; }
+
+        .card-title {
+            font-size: 11px;
+            font-weight: bold;
+            margin-bottom: 4px;
+        }
+
+        .card.goal {
+            border-left-color: #569cd6;
+        }
+
+        .card.goal .card-title {
+            color: #569cd6;
+        }
+
+        .card.subgoal {
+            border-left-color: #9cdcfe;
+        }
+
+        .card.subgoal .card-title {
+            color: #9cdcfe;
+        }
+
+        .card.running {
+            border-left-color: #dcdcaa;
+        }
+
+        .card.running .card-title {
+            color: #dcdcaa;
+        }
+
+        .card.result {
+            border-left-color: #4ec9b0;
+        }
+
+        .card.result .card-title {
+            color: #4ec9b0;
+        }
+
+        .card.done-finished {
+            border-left-color: #4ec9b0;
+        }
+
+        .card.done-finished .card-title {
+            color: #4ec9b0;
+        }
+
+        .card.done-aborted {
+            border-left-color: var(--vscode-errorForeground);
+        }
+
+        .card.done-aborted .card-title {
+            color: var(--vscode-errorForeground);
+        }
+
+        .card.done-max {
+            border-left-color: #dcdcaa;
+        }
+
+        .card.done-max .card-title {
+            color: #dcdcaa;
+        }
 
         .iteration-badge {
             display: inline-block;
@@ -154,8 +224,14 @@
             font-size: 12px;
         }
 
-        button:hover { background: var(--vscode-button-hoverBackground); }
-        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        button:hover {
+            background: var(--vscode-button-hoverBackground);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
 
         #queue-indicator {
             font-size: 10px;
@@ -164,7 +240,50 @@
             margin-bottom: 2px;
             min-height: 14px;
         }
+
+        .markdown-body p {
+            margin: 4px 0;
+        }
+
+        .markdown-body code {
+            background: var(--vscode-textCodeBlock-background, #1e1e1e);
+            padding: 1px 5px;
+            border-radius: 3px;
+            font-family: var(--vscode-editor-font-family, monospace);
+            font-size: 10px;
+        }
+
+        .markdown-body pre {
+            background: var(--vscode-textCodeBlock-background, #1e1e1e);
+            padding: 8px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 10px;
+        }
+
+        .markdown-body pre code {
+            background: none;
+            padding: 0;
+        }
+
+        .markdown-body ul,
+        .markdown-body ol {
+            padding-left: 16px;
+            margin: 4px 0;
+        }
+
+        .markdown-body h1,
+        .markdown-body h2,
+        .markdown-body h3 {
+            margin: 6px 0 4px;
+            font-size: 12px;
+        }
+
+        .markdown-body a {
+            color: var(--vscode-textLink-foreground);
+        }
     </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
 </head>
 
 <body>
@@ -294,12 +413,12 @@
         function scroll() { messagesEl.scrollTop = messagesEl.scrollHeight; }
 
         function escapeHtml(text) {
-            return String(text).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+            return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
         }
 
         function renderMarkdown(text) {
             return text
-                .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
                 .replace(/```(\w+)?\n([\s\S]*?)```/g, '<pre>$2</pre>')
                 .replace(/`([^`]+)`/g, '<code>$1</code>')
                 .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
@@ -411,20 +530,25 @@
 
             if (msg.type === 'agentDone') {
                 const statusMap = {
-                    'FINISHED':       { cls: 'done-finished', icon: '✅', label: 'Done' },
-                    'ABORTED':        { cls: 'done-aborted',  icon: '🛑', label: 'Aborted' },
-                    'TERMINATED':     { cls: 'done-aborted',  icon: '🛑', label: 'Terminated' },
-                    'STOPPED':        { cls: 'done-aborted',  icon: '⏹',  label: 'Stopped by user' },
-                    'MAX_ITERATIONS': { cls: 'done-max',      icon: '⚠️', label: 'Max iterations reached' },
+                    'FINISHED': { cls: 'done-finished', icon: '✅', label: 'Done' },
+                    'ABORTED': { cls: 'done-aborted', icon: '🛑', label: 'Aborted' },
+                    'TERMINATED': { cls: 'done-aborted', icon: '🛑', label: 'Terminated' },
+                    'STOPPED': { cls: 'done-aborted', icon: '⏹', label: 'Stopped by user' },
+                    'MAX_ITERATIONS': { cls: 'done-max', icon: '⚠️', label: 'Max iterations reached' },
                 };
                 const s = statusMap[msg.status] ?? { cls: 'done-finished', icon: '✅', label: msg.status };
                 const card = document.createElement('div');
                 card.className = 'card ' + s.cls;
                 card.innerHTML = '<div class="card-title">' + s.icon + ' ' + s.label + '</div>';
                 if (msg.message) {
+                    // const p = document.createElement('div');
+                    // p.style.fontSize = '11px';
+                    // p.textContent = msg.message;
+                    // card.appendChild(p);
                     const p = document.createElement('div');
                     p.style.fontSize = '11px';
-                    p.textContent = msg.message;
+                    p.classList.add('markdown-body');
+                    p.innerHTML = marked.parse(msg.message);  // ✅ renders markdown
                     card.appendChild(p);
                 }
                 messagesEl.appendChild(card);
@@ -462,4 +586,5 @@
         });
     </script>
 </body>
+
 </html>

@@ -47,9 +47,9 @@ export class ToolRegistry {
         `
     }
 
-    async summariseToolResult(client: AIProvider, tool: string, args: string, result: string){
+    async summariseToolResult(client: AIProvider, tool: string, args: string, reason: string, goal: string, result: string){
         const prompt = `
-        You will be given a tool, args and it's execution output.
+        You will be given a tool, args, reasoning and it's execution output.
         Summarise the result of the  tool execution.
         Summarised result should be less than 1000 chars.
         RETURN SUMARRIZED result string only.
@@ -57,21 +57,21 @@ export class ToolRegistry {
         return await client?.chat(
         [
             {"role" : "system", "content": prompt,},
-            {"role" : "user", "content": `tool: ${tool} || args: ${args}  || result: ${result}`,}
+            {"role" : "user", "content": `tool: ${tool} || args: ${args} || reasoning: ${reason} || goal: ${goal} || result: ${result}`,}
         ]
         )!;
         
     }
 
-    async executeTool(toolName: string, args: Record<string, unknown>, client: AIProvider){
+    async executeTool(toolName: string, args: Record<string, unknown>, reason: string, goal: string, client: AIProvider){
         if(!this.toolsMap.has(toolName)){
             throw `Invalid tool name selected : ${toolName}`
         }
         let tool = this.toolsMap.get(toolName)!;
         tool.setAiProvider(client);
         let result = await tool.execute(args);
-        if(result.length > 1000 && tool.shouldSummariseResult()) {
-            result = await this.summariseToolResult(client, toolName, JSON.stringify(args), result);
+        if(result && result.length > 5000 || tool.shouldSummariseResult()) {
+            result = await this.summariseToolResult(client, toolName, JSON.stringify(args), reason, goal,result);
         }
         console.log(`tool : ${tool}, result: ${result}`);
         return {
