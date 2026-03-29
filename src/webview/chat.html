@@ -224,15 +224,13 @@
             font-size: 12px;
         }
 
-        button:hover { background: var(--vscode-button-hoverBackground); }
-        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        button:hover {
+            background: var(--vscode-button-hoverBackground);
+        }
 
-        #queue-indicator {
-            font-size: 10px;
-            color: var(--vscode-descriptionForeground);
-            text-align: right;
-            margin-bottom: 2px;
-            min-height: 14px;
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
         }
 
         #queue-indicator {
@@ -420,7 +418,7 @@
 
         function renderMarkdown(text) {
             return text
-                .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
                 .replace(/```(\w+)?\n([\s\S]*?)```/g, '<pre>$2</pre>')
                 .replace(/`([^`]+)`/g, '<code>$1</code>')
                 .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
@@ -588,4 +586,5 @@
         });
     </script>
 </body>
+
 </html>
