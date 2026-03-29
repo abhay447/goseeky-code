@@ -1,13 +1,26 @@
 import * as vscode from "vscode";
 import { ChatManager } from "../providers";
-import { AgentState, applyEdit, createFile, runShell, runAgenticLoop, switchProvider } from "./agentExecution";
-import { getCurrentFileContext } from "./webviewRenderer";
+import { AgentState, applyEdit, createFile, switchProvider, requestStop } from "./agentExecution";
+import { runShell } from "../utils/shellUtils";
+import { ToolRegistry } from "../tools/toolRegistry";
+import { MultiStepAgent } from "../agents/types";
+import { GoSeekyAgent } from "../agents/goseekyAgent";
 
 export { AgentState };
+
+let goSeekyAgent: MultiStepAgent | null = null;
+
+function getAgent(): MultiStepAgent {
+    if (!goSeekyAgent) {
+        goSeekyAgent = new GoSeekyAgent();
+    }
+    return goSeekyAgent;
+}
 
 export async function handleAgentMessage(
     state: AgentState,
     chatManager: ChatManager,
+    toolRegistry: ToolRegistry,
     context: vscode.ExtensionContext,
     lastActiveEditor: vscode.TextEditor | undefined,
     webviewView: vscode.WebviewView,
@@ -22,18 +35,11 @@ export async function handleAgentMessage(
             webviewView.webview.postMessage({ type: "error", text: "No API key set. Run 'Goseeky: Set API Key'." });
             return;
         }
-        const config = vscode.workspace.getConfiguration("goseeky-code");
-        const temperature = config.get<number>("temperature", 0.0);
-        await runAgenticLoop(state, chatManager, msg.text, temperature, webviewView);
+        await getAgent().runAgenticLoop(state.activeProvider, msg.text, toolRegistry, context, webviewView);
     }
 
-    if (msg.type === "readFile") {
-        const ctx = getCurrentFileContext(lastActiveEditor);
-        if (!ctx) { webviewView.webview.postMessage({ type: "error", text: "No file open" }); return; }
-        try {
-            const { stdout } = await runShell(`cat "${ctx.path}"`);
-            webviewView.webview.postMessage({ type: "fileContent", path: ctx.path, content: stdout, language: ctx.language });
-        } catch (e: any) { webviewView.webview.postMessage({ type: "error", text: e.message }); }
+    if (msg.type === "stopAgent") {
+        requestStop();
     }
 
     if (msg.type === "applyEdit") {
@@ -76,7 +82,9 @@ export async function handleAgentMessage(
     }
 
     if (msg.type === "clearHistory") {
+        // Clear both the passed-in chatManager and the agent's internal history
         chatManager.clear();
+        getAgent().clearHistory();
         webviewView.webview.postMessage({ type: "historyCleared" });
     }
 }

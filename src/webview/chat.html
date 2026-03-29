@@ -37,7 +37,7 @@
         }
 
         #messages {
-            height: calc(100vh - 200px);
+            height: calc(100vh - 210px);
             overflow-y: auto;
             margin-bottom: 8px;
         }
@@ -52,6 +52,11 @@
         .user {
             background: var(--vscode-input-background);
             text-align: right;
+        }
+
+        .user.queued {
+            opacity: 0.5;
+            font-style: italic;
         }
 
         .assistant {
@@ -119,14 +124,6 @@
             color: #4ec9b0;
         }
 
-        .card.result.has-error {
-            border-left-color: var(--vscode-errorForeground);
-        }
-
-        .card.result.has-error .card-title {
-            color: var(--vscode-errorForeground);
-        }
-
         .card.done-finished {
             border-left-color: #4ec9b0;
         }
@@ -184,6 +181,7 @@
         #input-row {
             display: flex;
             gap: 4px;
+            align-items: flex-end;
         }
 
         textarea {
@@ -195,6 +193,25 @@
             border-radius: 4px;
             resize: none;
             font-family: inherit;
+        }
+
+        textarea:disabled {
+            opacity: 0.6;
+        }
+
+        #btn-send {
+            min-width: 52px;
+        }
+
+        #btn-stop {
+            display: none;
+            background: var(--vscode-errorForeground);
+            color: #fff;
+            min-width: 52px;
+        }
+
+        #btn-stop:hover {
+            opacity: 0.85;
         }
 
         button {
@@ -215,7 +232,58 @@
             opacity: 0.5;
             cursor: not-allowed;
         }
+
+        #queue-indicator {
+            font-size: 10px;
+            color: var(--vscode-descriptionForeground);
+            text-align: right;
+            margin-bottom: 2px;
+            min-height: 14px;
+        }
+
+        .markdown-body p {
+            margin: 4px 0;
+        }
+
+        .markdown-body code {
+            background: var(--vscode-textCodeBlock-background, #1e1e1e);
+            padding: 1px 5px;
+            border-radius: 3px;
+            font-family: var(--vscode-editor-font-family, monospace);
+            font-size: 10px;
+        }
+
+        .markdown-body pre {
+            background: var(--vscode-textCodeBlock-background, #1e1e1e);
+            padding: 8px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 10px;
+        }
+
+        .markdown-body pre code {
+            background: none;
+            padding: 0;
+        }
+
+        .markdown-body ul,
+        .markdown-body ol {
+            padding-left: 16px;
+            margin: 4px 0;
+        }
+
+        .markdown-body h1,
+        .markdown-body h2,
+        .markdown-body h3 {
+            margin: 6px 0 4px;
+            font-size: 12px;
+        }
+
+        .markdown-body a {
+            color: var(--vscode-textLink-foreground);
+        }
     </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
 </head>
 
 <body>
@@ -227,10 +295,14 @@
         <button id="btn-switch">🔄 <span id="provider-name">sarvam</span></button>
     </div>
     <div id="messages"></div>
+    <div id="queue-indicator"></div>
     <div id="input-row">
         <textarea id="input" rows="3"
             placeholder="Describe what you want to build or fix...&#10;(Shift+Enter for newline)"></textarea>
-        <button id="btn-send">Send</button>
+        <div style="display:flex;flex-direction:column;gap:4px;">
+            <button id="btn-send">Send</button>
+            <button id="btn-stop">⏹ Stop</button>
+        </div>
     </div>
 
     <script>
@@ -238,26 +310,98 @@
         const messagesEl = document.getElementById('messages');
         const inputEl = document.getElementById('input');
         const providerNameEl = document.getElementById('provider-name');
+        const btnSend = document.getElementById('btn-send');
+        const btnStop = document.getElementById('btn-stop');
+        const queueIndicator = document.getElementById('queue-indicator');
 
+        // ── State ─────────────────────────────────────────────────────────
+        let isProcessing = false;
+        let isStopped = false;
+        const messageQueue = [];
+
+        // ── Queue management ──────────────────────────────────────────────
+        function setProcessing(val) {
+            isProcessing = val;
+            inputEl.disabled = val;
+            btnSend.style.display = val ? 'none' : 'block';
+            btnStop.style.display = val ? 'block' : 'none';
+            if (!val) {
+                isStopped = false;
+                updateQueueIndicator();
+                // Process next queued message if any
+                if (messageQueue.length > 0) {
+                    const next = messageQueue.shift();
+                    updateQueueIndicator();
+                    dispatchMessage(next);
+                }
+            }
+        }
+
+        function updateQueueIndicator() {
+            if (messageQueue.length === 0) {
+                queueIndicator.textContent = '';
+            } else {
+                queueIndicator.textContent = `⏳ ${messageQueue.length} message${messageQueue.length > 1 ? 's' : ''} queued`;
+            }
+        }
+
+        function dispatchMessage(text) {
+            setProcessing(true);
+            vscode.postMessage({ type: 'ask', text });
+        }
+
+        // ── Toolbar ───────────────────────────────────────────────────────
         document.getElementById('btn-read').addEventListener('click', () => vscode.postMessage({ type: 'readFile' }));
         document.getElementById('btn-open').addEventListener('click', () => vscode.postMessage({ type: 'openFile' }));
         document.getElementById('btn-list').addEventListener('click', () => vscode.postMessage({ type: 'listFiles' }));
         document.getElementById('btn-clear').addEventListener('click', () => vscode.postMessage({ type: 'clearHistory' }));
         document.getElementById('btn-switch').addEventListener('click', () => vscode.postMessage({ type: 'switchProvider' }));
-        document.getElementById('btn-send').addEventListener('click', send);
 
+        btnStop.addEventListener('click', () => {
+            isStopped = true;
+            messageQueue.length = 0; // also drain queue on stop
+            updateQueueIndicator();
+            vscode.postMessage({ type: 'stopAgent' });
+            addMessage('🛑 Stop requested — waiting for current command to finish...', 'system');
+        });
+
+        btnSend.addEventListener('click', send);
         inputEl.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
         });
 
+        function hashCommand(str) {
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {
+                hash = ((hash << 5) - hash) + str.charCodeAt(i);
+                hash |= 0; // convert to 32bit int
+            }
+            return Math.abs(hash).toString(36);
+        }
+
+        // ── Send ──────────────────────────────────────────────────────────
         function send() {
             const text = inputEl.value.trim();
             if (!text) { return; }
-            addMessage(text, 'user');
             inputEl.value = '';
-            vscode.postMessage({ type: 'ask', text });
+            addMessage(text, 'user');
+
+            if (isProcessing) {
+                // Queue it
+                messageQueue.push(text);
+                updateQueueIndicator();
+                // Mark the message as queued visually
+                const msgs = messagesEl.querySelectorAll('.msg.user');
+                if (msgs.length > 0) {
+                    msgs[msgs.length - 1].classList.add('queued');
+                    msgs[msgs.length - 1].title = 'Queued — will send after current request finishes';
+                }
+            } else {
+                dispatchMessage(text);
+            }
         }
 
+        // ── Helpers ───────────────────────────────────────────────────────
         function addMessage(text, cls) {
             const div = document.createElement('div');
             div.className = 'msg ' + cls;
@@ -266,27 +410,10 @@
             scroll();
         }
 
-        function addCard(cls, title, body) {
-            const card = document.createElement('div');
-            card.className = 'card ' + cls;
-            const t = document.createElement('div');
-            t.className = 'card-title';
-            t.textContent = title;
-            card.appendChild(t);
-            if (body) {
-                const pre = document.createElement('pre');
-                pre.textContent = body;
-                card.appendChild(pre);
-            }
-            messagesEl.appendChild(card);
-            scroll();
-            return card;
-        }
-
         function scroll() { messagesEl.scrollTop = messagesEl.scrollHeight; }
 
         function escapeHtml(text) {
-            return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
         }
 
         function renderMarkdown(text) {
@@ -298,8 +425,9 @@
                 .replace(/\n/g, '<br>');
         }
 
-        // Track current iteration group
+        // ── Iteration groups ──────────────────────────────────────────────
         let currentIterationEl = null;
+        let lastIteration = { n: 0, max: 0 };
 
         function getOrCreateIterationGroup(iteration, max) {
             const id = 'iter-' + iteration;
@@ -319,14 +447,13 @@
             return el;
         }
 
-        function addToIteration(iteration, max, childEl) {
-            const group = getOrCreateIterationGroup(iteration, max);
-            group.appendChild(childEl);
+        function appendToIteration(childEl) {
+            if (currentIterationEl) { currentIterationEl.appendChild(childEl); }
+            else { messagesEl.appendChild(childEl); }
             scroll();
         }
 
-        let lastIteration = { n: 0, max: 0 };
-
+        // ── Message handler ───────────────────────────────────────────────
         window.addEventListener('message', (e) => {
             const msg = e.data;
 
@@ -338,63 +465,67 @@
             if (msg.type === 'agentGoal') {
                 const card = document.createElement('div');
                 card.className = 'card goal';
-                card.innerHTML = '<div class="card-title">🎯 Goal</div><div>' + escapeHtml(msg.goal) + '</div>';
-                if (currentIterationEl) { currentIterationEl.appendChild(card); }
-                else { messagesEl.appendChild(card); }
-                scroll();
+                card.innerHTML = '<div class="card-title">🎯 Goal</div><div>' + escapeHtml(msg.content) + '</div>';
+                appendToIteration(card);
             }
 
             if (msg.type === 'agentSubGoal') {
                 const card = document.createElement('div');
                 card.className = 'card subgoal';
                 card.innerHTML = '<div class="card-title">📋 ' + escapeHtml(msg.title) + '</div>';
-                if (currentIterationEl) { currentIterationEl.appendChild(card); }
-                else { messagesEl.appendChild(card); }
-                scroll();
+                appendToIteration(card);
             }
 
             if (msg.type === 'shellRunning') {
                 const card = document.createElement('div');
                 card.className = 'card running';
-                card.id = 'running-' + btoa(msg.command).slice(0, 12);
+                card.id = 'running-' + hashCommand(msg.command).slice(0, 12);
                 card.innerHTML = '<div class="card-title">⏳ Running</div><pre>' + escapeHtml(msg.command) + '</pre>';
-                if (currentIterationEl) { currentIterationEl.appendChild(card); }
-                else { messagesEl.appendChild(card); }
-                scroll();
+                appendToIteration(card);
             }
 
             if (msg.type === 'shellResult') {
-                if (msg.type === 'shellResult') {
-                    const runningId = 'running-' + btoa(msg.command).slice(0, 12);
-                    const runningCard = document.getElementById(runningId);
+                const runningId = 'running-' + hashCommand(msg.command).slice(0, 12);
+                const runningCard = document.getElementById(runningId);
 
-                    const hasError = !!msg.stderr;
-                    const card = document.createElement('div');
-                    // neutral styling — no done/error coloring
-                    card.className = 'card result';
+                const card = document.createElement('div');
+                card.className = 'card result';
+                const shortCmd = msg.command.length > 60 ? msg.command.slice(0, 60) + '...' : msg.command;
+                card.innerHTML = '<div class="card-title">$ ' + escapeHtml(shortCmd) + '</div>';
 
-                    const shortCmd = msg.command.length > 60 ? msg.command.slice(0, 60) + '...' : msg.command;
-                    card.innerHTML = '<div class="card-title">$ ' + escapeHtml(shortCmd) + '</div>';
-
-                    if (msg.stdout && msg.stdout !== '(no output)') {
-                        const pre = document.createElement('pre');
-                        pre.textContent = msg.stdout;
-                        card.appendChild(pre);
-                    }
-                    if (msg.stderr) {
-                        const pre = document.createElement('pre');
-                        pre.style.color = 'var(--vscode-errorForeground)';
-                        pre.textContent = '⚠️ stderr: ' + msg.stderr;
-                        card.appendChild(pre);
-                    }
-
-                    if (runningCard) { runningCard.replaceWith(card); }
-                    else {
-                        if (currentIterationEl) { currentIterationEl.appendChild(card); }
-                        else { messagesEl.appendChild(card); }
-                    }
-                    scroll();
+                if (msg.stdout && msg.stdout !== '(no output)') {
+                    const pre = document.createElement('pre');
+                    pre.textContent = msg.stdout;
+                    card.appendChild(pre);
                 }
+                if (msg.stderr) {
+                    const pre = document.createElement('pre');
+                    pre.style.color = 'var(--vscode-errorForeground)';
+                    pre.textContent = '⚠️ stderr: ' + msg.stderr;
+                    card.appendChild(pre);
+                }
+
+                if (runningCard) { runningCard.replaceWith(card); }
+                else { appendToIteration(card); }
+            }
+
+            if (msg.type === 'toolResult') {
+                const command = JSON.stringify(msg.tool) + " \n " + JSON.stringify(msg.arguments) + " \n ";
+                const runningId = 'running-' + hashCommand(command).slice(0, 12);
+                const runningCard = document.getElementById(runningId);
+
+                const card = document.createElement('div');
+                card.className = 'card result';
+                const shortCmd = command.length > 60 ? command.slice(0, 60) + '...' : command;
+                card.innerHTML = '<div class="card-title">$ ' + escapeHtml(shortCmd) + '</div>';
+
+                if (msg.result && msg.result !== '(no output)') {
+                    const pre = document.createElement('pre');
+                    pre.textContent = command + msg.result;
+                    card.appendChild(pre);
+                }
+                if (runningCard) { runningCard.replaceWith(card); }
+                else { appendToIteration(card); }
             }
 
             if (msg.type === 'agentDone') {
@@ -402,6 +533,7 @@
                     'FINISHED': { cls: 'done-finished', icon: '✅', label: 'Done' },
                     'ABORTED': { cls: 'done-aborted', icon: '🛑', label: 'Aborted' },
                     'TERMINATED': { cls: 'done-aborted', icon: '🛑', label: 'Terminated' },
+                    'STOPPED': { cls: 'done-aborted', icon: '⏹', label: 'Stopped by user' },
                     'MAX_ITERATIONS': { cls: 'done-max', icon: '⚠️', label: 'Max iterations reached' },
                 };
                 const s = statusMap[msg.status] ?? { cls: 'done-finished', icon: '✅', label: msg.status };
@@ -409,39 +541,41 @@
                 card.className = 'card ' + s.cls;
                 card.innerHTML = '<div class="card-title">' + s.icon + ' ' + s.label + '</div>';
                 if (msg.message) {
+                    // const p = document.createElement('div');
+                    // p.style.fontSize = '11px';
+                    // p.textContent = msg.message;
+                    // card.appendChild(p);
                     const p = document.createElement('div');
                     p.style.fontSize = '11px';
-                    p.textContent = msg.message;
+                    p.classList.add('markdown-body');
+                    p.innerHTML = marked.parse(msg.message);  // ✅ renders markdown
                     card.appendChild(p);
                 }
                 messagesEl.appendChild(card);
                 currentIterationEl = null;
                 scroll();
+                // Release processing lock — triggers queue drain
+                setProcessing(false);
+                // Un-queue the oldest queued message visually
+                const queued = messagesEl.querySelector('.msg.user.queued');
+                if (queued) { queued.classList.remove('queued'); }
             }
 
-            if (msg.type === 'reply') {
-                addMessage(msg.text, 'assistant');
-            }
-
+            if (msg.type === 'reply') { addMessage(msg.text, 'assistant'); }
             if (msg.type === 'error') {
                 addMessage('❌ ' + msg.text, 'error');
+                setProcessing(false);
             }
-
-            if (msg.type === 'editApplied') {
-                addMessage('✅ File saved.', 'system');
-            }
-
-            if (msg.type === 'fileContent') {
-                addMessage('📄 Loaded: ' + msg.path, 'system');
-            }
-
-            if (msg.type === 'fileList') {
-                addMessage('📁 Files:\n' + msg.files.join('\n'), 'assistant');
-            }
+            if (msg.type === 'editApplied') { addMessage('✅ File saved.', 'system'); }
+            if (msg.type === 'fileContent') { addMessage('📄 Loaded: ' + msg.path, 'system'); }
+            if (msg.type === 'fileList') { addMessage('📁 Files:\n' + msg.files.join('\n'), 'assistant'); }
 
             if (msg.type === 'historyCleared') {
                 messagesEl.innerHTML = '';
                 currentIterationEl = null;
+                messageQueue.length = 0;
+                updateQueueIndicator();
+                setProcessing(false);
                 addMessage('🗑 History cleared', 'system');
             }
 

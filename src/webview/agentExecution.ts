@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
-import * as cp from "child_process";
 import { ChatManager, GeminiProvider, SarvamProvider } from "../providers";
-import { buildSystemPrompt, getCurrentFileContext } from "./webviewRenderer";
+import { buildSystemPrompt } from "./webviewRenderer";
+import { runShell } from "../utils/shellUtils";
 
 export interface AgentState {
     activeProvider: SarvamProvider | GeminiProvider | null;
@@ -29,15 +29,18 @@ interface CommandResult {
     error?: string;
 }
 
-// ── Shell executor ────────────────────────────────────────────────────────────
-export function runShell(command: string, cwd?: string): Promise<{ stdout: string; stderr: string }> {
-    return new Promise((resolve, reject) => {
-        const workspacePath = cwd ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd();
-        cp.exec(command, { cwd: workspacePath, shell: "/bin/bash" }, (err, stdout, stderr) => {
-            if (err) { reject(new Error(stderr || err.message)); }
-            else { resolve({ stdout, stderr }); }
-        });
-    });
+// ── Stop flag ─────────────────────────────────────────────────────────────────
+let stopRequested = false;
+export function isStopped(): boolean {
+    return stopRequested;
+}
+
+export function resetStop(): void {
+    stopRequested = false;
+}
+
+export function requestStop() {
+    stopRequested = true;
 }
 
 // ── XML helpers ───────────────────────────────────────────────────────────────
@@ -58,7 +61,6 @@ function extractAllTags(text: string, tag: string): string[] {
     while (idx !== -1) {
         const endIdx = text.indexOf(endTag, idx + startTag.length);
         if (endIdx === -1) {
-            // unclosed — take to end of string
             results.push(text.slice(idx + startTag.length).trim());
             break;
         }
@@ -69,33 +71,56 @@ function extractAllTags(text: string, tag: string): string[] {
 }
 
 // ── Parse agent XML response ──────────────────────────────────────────────────
+// Resilient: always extracts ALL <run-shell> commands from anywhere in the reply,
+// regardless of how mangled the XML structure is.
 export function parseAgentResponse(raw: string): AgentResponse {
-    const responseBlock = extractTag(raw, "response") || raw;
+    // Try to get goal/status from first <response> block if present
+    const firstResponseStart = raw.indexOf("<response>");
+    const firstResponseEnd = raw.indexOf("</response>");
+    const firstBlock = (firstResponseStart !== -1 && firstResponseEnd !== -1)
+        ? raw.slice(firstResponseStart, firstResponseEnd + "</response>".length)
+        : raw;
 
-    const goal = extractTag(responseBlock, "goal");
-    const stage = extractTag(responseBlock, "stage");
+    const goal = extractTag(firstBlock, "goal") || extractTag(raw, "goal");
+    const stage = extractTag(firstBlock, "stage") || extractTag(raw, "stage");
 
-    // Extract top-level status — last one wins to avoid matching sub-goal status
-    const allStatuses = extractAllTags(responseBlock, "status");
-    const status = allStatuses[allStatuses.length - 1] ?? "";
+    // Top-level status — extract from <response> block AFTER stripping sub-goals,
+    // so sub-goal <status> tags don't bleed into the top-level status
+    const responseBlockForStatus = firstBlock
+        .replace(/<sub-goals>[\s\S]*?<\/sub-goals>/gi, "")
+        .replace(/<sub-goal>[\s\S]*?<\/sub-goal>/gi, "");
+    const topLevelStatuses = extractAllTags(responseBlockForStatus, "status");
+    const status = topLevelStatuses[topLevelStatuses.length - 1] ?? "";
 
-    const subGoalBlocks = extractAllTags(responseBlock, "sub-goal");
-    const subGoals: SubGoal[] = subGoalBlocks.map(sg => {
-        const title = extractTag(sg, "title");
-        const sgStatus = extractTag(sg, "status");
-        const commandsBlock = extractTag(sg, "commands");
-        const commands = extractAllTags(commandsBlock || sg, "run-shell");
-        return { title, status: sgStatus, commands };
-    });
+    // ── Extract commands only from non-FINISHED sub-goals ─────────────────────
+    // Flat fallback: if no sub-goal blocks found, take all <run-shell> from reply
+    let subGoals: SubGoal[] = [];
+    const subGoalBlocks = extractAllTags(raw, "sub-goal");
+
+    if (subGoalBlocks.length > 0) {
+        subGoals = subGoalBlocks
+            .map(sg => {
+                const title = extractTag(sg, "title");
+                const sgStatus = extractTag(sg, "status");
+                const commandsBlock = extractTag(sg, "commands");
+                const commands = extractAllTags(commandsBlock || sg, "run-shell");
+                return { title, status: sgStatus, commands };
+            })
+            .filter(sg => !["FINISHED", "COMPLETED", "ABORTED", "TERMINATED"].includes(sg.status.toUpperCase()));
+    } else {
+        // Fallback: malformed XML — take all commands from entire reply
+        const allCommands = extractAllTags(raw, "run-shell");
+        if (allCommands.length > 0) {
+            subGoals = [{ title: goal || "Executing", status: "INPROGRESS", commands: allCommands }];
+        }
+    }
 
     return { goal, stage, subGoals, status };
 }
 
 // ── Execute all sub-goals, collect results ────────────────────────────────────
 async function executeSubGoals(
-    subGoals: SubGoal[],
-    webviewView: vscode.WebviewView
-): Promise<CommandResult[]> {
+subGoals: SubGoal[], webviewView: vscode.WebviewView, alreadyRun: string[]): Promise<CommandResult[]> {
     const results: CommandResult[] = [];
 
     for (const sg of subGoals) {
@@ -108,10 +133,17 @@ async function executeSubGoals(
         });
 
         for (const command of sg.commands) {
+            if (stopRequested) { return results; }
+            if(alreadyRun.includes(command)){
+                console.log("command already tried" + command)
+                continue
+            }
+
             webviewView.webview.postMessage({ type: "shellRunning", command });
 
             try {
                 const { stdout, stderr } = await runShell(command);
+                console.log("command outputs" + command + " || " + stdout + " || " + stderr)
                 results.push({ command, stdout: stdout || "(no output)", stderr: stderr || "" });
                 webviewView.webview.postMessage({
                     type: "shellResult",
@@ -119,7 +151,6 @@ async function executeSubGoals(
                     stdout: stdout || "(no output)",
                     stderr: stderr || ""
                 });
-                // Reload editor after each file-touching command
                 await vscode.commands.executeCommand("workbench.action.files.revert");
             } catch (e: any) {
                 results.push({ command, stdout: "", stderr: "", error: e.message });
@@ -130,6 +161,8 @@ async function executeSubGoals(
                     stderr: e.message
                 });
             }
+
+            if (stopRequested) { return results; }
         }
     }
 
@@ -141,10 +174,18 @@ function formatResultsForAI(results: CommandResult[]): string {
     if (results.length === 0) { return "No commands were executed."; }
     return results.map(r => {
         const lines = [`$ ${r.command}`];
-        if (r.error) { lines.push(`ERROR: ${r.error}`); }
-        else {
-            if (r.stdout) { lines.push(`stdout:\n${r.stdout}`); }
-            if (r.stderr) { lines.push(`stderr:\n${r.stderr}`); }
+        if (r.error) {
+            lines.push(`FAILED: ${r.error}`);
+        } else {
+            lines.push(`EXIT: success`);
+            if (r.stdout && r.stdout !== "(no output)") {
+                lines.push(`stdout:\n${r.stdout}`);
+            } else {
+                lines.push(`stdout: (empty — command ran successfully but produced no output)`);
+            }
+            if (r.stderr) {
+                lines.push(`stderr:\n${r.stderr}`);
+            }
         }
         return lines.join("\n");
     }).join("\n---\n");
@@ -158,25 +199,34 @@ export async function runAgenticLoop(
     temperature: number,
     webviewView: vscode.WebviewView
 ): Promise<void> {
-    const MAX_ITERATIONS = 8;
+    stopRequested = false;
+    const MAX_ITERATIONS = 100;
     let iteration = 0;
     let accumulatedResults: CommandResult[] = [];
     let goalShown = false;
+    let lastCommandSignature = "";
+    let repeatedCommandCount = 0;
+    const executedCommands = new Set<string>(); // track all commands run so far
 
     while (iteration < MAX_ITERATIONS) {
         iteration++;
 
+        if (stopRequested) {
+            webviewView.webview.postMessage({ type: "agentDone", status: "STOPPED" });
+            return;
+        }
+
         webviewView.webview.postMessage({ type: "agentIteration", iteration, max: MAX_ITERATIONS });
 
-        // Rebuild system prompt with latest file context each iteration
-        const fileContext = getCurrentFileContext(undefined);
         const systemPrompt = buildSystemPrompt();
+        const attemptsLeft = MAX_ITERATIONS - iteration;
 
-        // On first turn use raw user text; subsequent turns feed back results
+        const alreadyRun = accumulatedResults.map(r => r.command);
+        console.log("alreadyRun" + alreadyRun);
         const userMessage = accumulatedResults.length === 0
             ? userText
-            : `Original goal: ${userText}\n\nResults from previous commands:\n${formatResultsForAI(accumulatedResults)}\n\nContinue working towards the goal. If done, set status to FINISHED.`;
-
+            : `Original goal: ${userText}\n\nCommands already executed (DO NOT repeat these):\n${alreadyRun.map(c => `- ${c}`).join("\n")}\n\nResults:\n${formatResultsForAI(accumulatedResults)}\n\nAttempts remaining: ${attemptsLeft}. Continue with NEW commands only. If the goal is achieved or cannot be achieved, set status to FINISHED or ABORTED.`;
+        console.log(userMessage)
         let reply: string;
         try {
             reply = await chatManager.chat(
@@ -190,6 +240,11 @@ export async function runAgenticLoop(
             return;
         }
 
+        if (stopRequested) {
+            webviewView.webview.postMessage({ type: "agentDone", status: "STOPPED" });
+            return;
+        }
+
         const parsed = parseAgentResponse(reply);
 
         // Show goal once
@@ -198,36 +253,107 @@ export async function runAgenticLoop(
             goalShown = true;
         }
 
-        // Show any explanation text outside the XML block
-        const cleanReply = reply.replace(/<response>[\s\S]*<\/response>/g, "").trim();
-        if (cleanReply) {
-            webviewView.webview.postMessage({ type: "reply", text: cleanReply });
+        // Show explanation text — prefer text before <response>, fall back to inside
+        const firstResponseIdx = reply.indexOf("<response>");
+        const lastResponseEnd = reply.lastIndexOf("</response>");
+        const outsideResponse = firstResponseIdx !== -1
+            ? reply.slice(0, firstResponseIdx).trim()
+            : "";
+
+        // Extract full inner content of all <response> blocks, strip XML tags, show as text
+        const insideResponse = (firstResponseIdx !== -1 && lastResponseEnd !== -1)
+            ? reply.slice(firstResponseIdx, lastResponseEnd + "</response>".length)
+                .replace(/<\/?response>/g, "")
+                .replace(/<goal>[\s\S]*?<\/goal>/g, "")
+                .replace(/<stage>[\s\S]*?<\/stage>/g, "")
+                .replace(/<status>[\s\S]*?<\/status>/g, "")
+                .replace(/<sub-goals>[\s\S]*?<\/sub-goals>/g, "")
+                .replace(/<sub-goal>[\s\S]*?<\/sub-goal>/g, "")
+                .replace(/<commands>[\s\S]*?<\/commands>/g, "")
+                .replace(/<run-shell>[\s\S]*?<\/run-shell>/g, "")
+                .replace(/<title>[\s\S]*?<\/title>/g, "")
+                .trim()
+            : "";
+
+        const displayText = outsideResponse || insideResponse;
+        if (displayText) {
+            webviewView.webview.postMessage({ type: "reply", text: displayText });
         }
 
-        // Check for terminal status before executing
-        const terminalStatus = ["FINISHED", "ABORTED", "TERMINATED"].includes(parsed.status.toUpperCase());
         const hasCommands = parsed.subGoals.some(sg => sg.commands.length > 0);
+        const terminalStatus = ["FINISHED", "COMPLETED", "ABORTED", "TERMINATED"].includes(parsed.status.toUpperCase());
 
-        if (!hasCommands && !terminalStatus) {
-            // AI returned no commands and no terminal status — treat as done
-            webviewView.webview.postMessage({ type: "agentDone", status: "FINISHED" });
-            return;
+        // If model omitted top-level <status> but all sub-goals are done, treat as terminal
+        const allSubGoalsDone = parsed.subGoals.length > 0 &&
+            parsed.subGoals.every(sg =>
+                ["FINISHED", "COMPLETED", "ABORTED", "TERMINATED"].includes(sg.status.toUpperCase())
+            );
+        const effectivelyDone = terminalStatus || (allSubGoalsDone && !hasCommands);
+
+        if (!hasCommands && !effectivelyDone && !displayText && parsed.goal) {
+            webviewView.webview.postMessage({ type: "reply", text: parsed.goal });
         }
 
         if (hasCommands) {
-            const iterationResults = await executeSubGoals(parsed.subGoals, webviewView);
-            accumulatedResults = iterationResults; // pass only latest results to next turn
+            // Detect repeated commands — if same set of commands runs twice, break
+            const currentSignature = parsed.subGoals
+                .flatMap(sg => sg.commands)
+                .join("|");
+
+            // Check if ALL commands in this batch have already been run
+            const allCommandsAlreadyRun = parsed.subGoals
+                .flatMap(sg => sg.commands)
+                .every(cmd => executedCommands.has(cmd.trim()));
+
+            if (allCommandsAlreadyRun) {
+                repeatedCommandCount++;
+                if (repeatedCommandCount >= 3) {
+                    webviewView.webview.postMessage({
+                        type: "agentDone",
+                        status: "ABORTED",
+                        message: "Stuck in a loop — same commands repeated. Try rephrasing your request."
+                    });
+                    return;
+                }
+            } else {
+                repeatedCommandCount = 0;
+            }
+            lastCommandSignature = currentSignature;
+
+            const newResults = await executeSubGoals(parsed.subGoals, webviewView, alreadyRun);
+            // Track all executed commands
+            parsed.subGoals.flatMap(sg => sg.commands).forEach(cmd => executedCommands.add(cmd.trim()));
+            accumulatedResults = [...accumulatedResults, ...newResults]; // append, not replace
+
+            if (stopRequested) {
+                webviewView.webview.postMessage({ type: "agentDone", status: "STOPPED" });
+                return;
+            }
         }
 
-        if (terminalStatus) {
-            webviewView.webview.postMessage({ type: "agentDone", status: parsed.status.toUpperCase() });
+        if (effectivelyDone) {
+            const finalStatus = terminalStatus ? parsed.status.toUpperCase() : "FINISHED";
+            // If nothing was shown as a reply yet, summarize the last results
+            if (!displayText && accumulatedResults.length > 0) {
+                const summary = accumulatedResults
+                    .map(r => r.error ? `Error: ${r.error}` : r.stdout && r.stdout !== "(no output)" ? r.stdout.trim() : "")
+                    .filter(Boolean)
+                    .join("\n");
+                if (summary) {
+                    webviewView.webview.postMessage({ type: "reply", text: summary });
+                }
+            }
+            webviewView.webview.postMessage({ type: "agentDone", status: finalStatus });
             return;
         }
 
-        // INPROGRESS — loop again with results
+        // If no commands and not done — treat as finished
+        if (!hasCommands) {
+            webviewView.webview.postMessage({ type: "agentDone", status: "FINISHED" });
+            return;
+        }
     }
 
-    // Hit max iterations
     webviewView.webview.postMessage({
         type: "agentDone",
         status: "MAX_ITERATIONS",
