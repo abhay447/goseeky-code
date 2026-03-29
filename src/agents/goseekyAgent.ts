@@ -7,6 +7,7 @@ import { stringToSingleJsonBlock } from "../utils/jsonUtils";
 import { isStopped, resetStop } from "../webview/agentExecution";
 import { MultiStepAgent } from "./types";
 import { ChatHistoryManager } from "../providers/chatHistoryManager";
+import { getExtensionContextInfo } from "../tools/shellTools";
 
 // ─────────────────────────────────────────
 // STATE DEFINITION
@@ -59,13 +60,14 @@ export class GoSeekyAgent implements MultiStepAgent {
 
       if (isStopped()) return { answer: "STOPPED" };
 
-      const MAX_ATTEMPTS = 3;
+      const MAX_ATTEMPTS = 6;
+      let lastError = "";
 
       for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
         try {
           const isRetry = attempt > 0;
           const userPrompt = isRetry
-            ? `Attempt ${attempt + 1}/${MAX_ATTEMPTS}: previous response could not be parsed as valid JSON. Fix the format and try again.\n\n${this.buildUserPrompt(state, toolRegistry)}`
+            ? `Attempt ${attempt + 1}/${MAX_ATTEMPTS}: previous response could not be parsed as valid JSON. ${lastError}. Fix the format and try again.\n\n${this.buildUserPrompt(state, toolRegistry)}`
             : this.buildUserPrompt(state, toolRegistry, this.chatHistoryManager);
 
           const messages = [
@@ -78,7 +80,11 @@ export class GoSeekyAgent implements MultiStepAgent {
           webviewView.webview.postMessage({ type: "agentGoal", content: reply });
 
           const parsed = this.safeParseJSON(reply);
-          if (!parsed.ok) continue; // retry
+          if (!parsed.ok) {
+            // retry
+            lastError = parsed.error;
+            continue;
+          }
 
           return {
             decision: parsed.value,
@@ -218,8 +224,7 @@ export class GoSeekyAgent implements MultiStepAgent {
       toolResults: [],
       steps: 0,
       maxSteps: 20,
-    },{ recursionLimit: 100 });
-    let agentResponse = "";
+    }, { recursionLimit: 100 });
     console.log(JSON.stringify(result))
     if (typeof result?.answer === "string" && result.answer) {
       this.chatHistoryManager.addHistory(client, userQuery, result.answer);
@@ -231,7 +236,7 @@ export class GoSeekyAgent implements MultiStepAgent {
       webviewView.webview.postMessage({
         type: "agentDone",
         status: "MAX_ITERATIONS",
-        message: "Could not complete task within step limit.",
+        message: `Could not complete task within step limit. Agent reasoning: ${result.decision.reasoning || "No reasoning available"}, error: ${result.agentError || "No error message"}`,
       });
       return "FAILURE";
     }
@@ -241,7 +246,7 @@ export class GoSeekyAgent implements MultiStepAgent {
     webviewView.webview.postMessage({
       type: "error",
       status: "FAILURE",
-      text: "Could not complete task",
+      text: `Could not complete task. Agent reasoning: ${result.decision.reasoning || "No reasoning available"}, error: ${result.agentError || "No error message"}`,
     });
 
     return "FAILURE";
@@ -266,30 +271,48 @@ export class GoSeekyAgent implements MultiStepAgent {
     Recent Conversation History:
     ${chatHistoryManager ? chatHistoryManager.getHistory().map(h => `User: ${h.userQuery}\nAgent: ${h.agentResponse}`).join("\n\n") : "No history."}
 
-    STRICT JSON ONLY.
+    
+
+     Response instructions:
+      - STRICT JSON ONLY.
+      - NEVER RETURN PLAIN TEXT, XML, HTML.
+      - Use type=final if you want to return the answer to the user and no tool calls are pending. 
+      - Any tool_name and args should be ignored if type=final, only answer and reasoning will be considered by the system.
+      - DO NOT SendToUser with final since incase of final only answer and reasoning is expected, tool_name and arguments will be ignored by the system.
+
     `;
   }
 
   private buildPlannerSystemPrompt(toolRegistry: ToolRegistry) {
     return `
-    You are an expert agent.
+You are an expert coding agent.
 
-    ${toolRegistry.listToolsPrompt()}
+RESPONSE FORMAT — CRITICAL:
+- Your ENTIRE response must be a single raw JSON object.
+- Do NOT wrap it in markdown fences (\`\`\`json ... \`\`\`).
+- Do NOT include any XML tags, chain-of-thought, preamble, or explanation outside the JSON.
+- Do NOT include any text before or after the JSON object.
+- The response must be directly parseable by JSON.parse() with no preprocessing.
 
-    ALWAYS RETURN A JSON IN THIS FORMAT :
-    {
-      "type": "tool" | "final", 
-      "reasoning": "...",
-      "tool_name": "...", // only when type is "tool".
-      "arguments": {},
-      "answer": "..."
-    }
+Return exactly this shape:
+{
+  "type": "tool" | "final",
+  "reasoning": "your internal reasoning here, kept inside the JSON",
+  "tool_name": "ToolNameHere or empty string if type is final",
+  "arguments": {},
+  "answer": "final answer to user if type is final, otherwise empty string"
+}
 
-    Response instructions:
-      - NEVER RETURN PLAIN TEXT, XML, HTML.
-      - Use type=final if you want to return the answer to the user and no tool calls are pending. 
-      - Any tool_name and args should be ignored if type=final, only answer and reasoning will be considered by the system.
-      - DO NOT SendToUser with final since incase of final only answer and reasoning is expected, tool_name and arguments will be ignored by the system.
-`;
+TOOLS AVAILABLE:
+${toolRegistry.listToolsPrompt()}
+
+RULES:
+- Use "type": "tool" when you need to call a tool to make progress.
+- Use "type": "final" when you have enough information to answer the user.
+- Never invent tool names. Only use tools listed above.
+- Never output XML. Never output markdown. Raw JSON only.
+- Always use exact path mentioned below while generating filesystem paths using the context info. Do not make up or assume any paths. Always use the provided context info for paths.
+${JSON.stringify(getExtensionContextInfo(), null, 2)}
+  `.trim();
   }
 }
