@@ -175,6 +175,7 @@ export class GoSeekyAgent implements MultiStepAgent {
   // ROUTER
   // ─────────────────────────────────────────
   private router(state: AgentStateType): string {
+    if(isStopped()) return "__end__";
     if (state.agentError) return "errorHandler";
     if ((state.steps || 0) >= (state.maxSteps || 20)) return "__end__";
     if (state.decision?.type === "final") return "final";
