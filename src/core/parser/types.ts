@@ -14,8 +14,8 @@ export interface Entity {
   name: string;
   type: EntityType;
   filePath: string;
-  startIndex?: number;
-  endIndex?: number;
+  codeByteStartIndex?: number;
+  codeByteEndIndex?: number;
   signature?: string;
   docstring?: string;
   dependencies?: string[];

@@ -49,8 +49,8 @@ export class TypeScriptExtractor {
                         name: className,
                         type: "class",
                         filePath,
-                        startIndex: node.startIndex,
-                        endIndex: node.endIndex,
+                        codeByteStartIndex: node.startIndex,
+                        codeByteEndIndex: node.endIndex,
                         code: extractCodeSnippet(code, node.startIndex, node.endIndex)
                     });
 
@@ -78,8 +78,8 @@ export class TypeScriptExtractor {
                         name: fullName,
                         type: "method",
                         filePath,
-                        startIndex: node.startIndex,
-                        endIndex: node.endIndex,
+                        codeByteStartIndex: node.startIndex,
+                        codeByteEndIndex: node.endIndex,
                         code: extractCodeSnippet(code, node.startIndex, node.endIndex)
                     });
 
@@ -104,8 +104,8 @@ export class TypeScriptExtractor {
                         name: fnName,
                         type: "function",
                         filePath,
-                        startIndex: node.startIndex,
-                        endIndex: node.endIndex,
+                        codeByteStartIndex: node.startIndex,
+                        codeByteEndIndex: node.endIndex,
                         code: extractCodeSnippet(code, node.startIndex, node.endIndex)
                     });
 
@@ -137,8 +137,8 @@ export class TypeScriptExtractor {
                             name: fullName,
                             type: "function",
                             filePath,
-                            startIndex: node.startIndex,
-                            endIndex: node.endIndex,
+                            codeByteStartIndex: node.startIndex,
+                            codeByteEndIndex: node.endIndex,
                             code: extractCodeSnippet(code, node.startIndex, node.endIndex)
                         });
 
@@ -161,8 +161,8 @@ export class TypeScriptExtractor {
                             name,
                             type: "constant",
                             filePath,
-                            startIndex: node.startIndex,
-                            endIndex: node.endIndex,
+                            codeByteStartIndex: node.startIndex,
+                            codeByteEndIndex: node.endIndex,
                             code: extractCodeSnippet(code, node.startIndex, node.endIndex)
                         });
                     }

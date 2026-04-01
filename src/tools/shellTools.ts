@@ -35,11 +35,11 @@ export class ShellExecute implements AgentTool {
   constructor() {
     this.name = 'ShellExecute'
     this.toolDescription = `
-      This is the primary tool for inspecting , reading, finding and editing code wrt user query.
-      You should also use this tool for any os or filesystem related interactions.
-      If a .git folder is present then restrict all interactions to git visible files only .
-      Make sure shell_script egenrated is a valid string wrt JSON Serialization and escaping rules.
-      Here is the extension context info that might be useful for you to construct shell commands:
+      - This is the primary tool for inspecting , reading, finding and editing code wrt user query.
+      - You should also use this tool for any os or filesystem related interactions.
+      - If a .git folder is present then restrict all interactions to git visible files only .
+      - Make sure shell_script egenrated is a valid string wrt JSON Serialization and escaping rules.
+      - Here is the extension context info that might be useful for you to construct shell commands:
       ${JSON.stringify(getExtensionContextInfo(), null, 2)}
 
       Here is the argument schema for this tool:

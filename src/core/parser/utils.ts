@@ -20,8 +20,8 @@ export async function extractEntityCode(entityId: string, hybridStore: HybridSto
     if (entity.code?.endsWith("..")) {
       return extractCodeSnippetFromFile(
         entity.filePath,
-        entity.startIndex!,
-        entity.endIndex!,
+        entity.codeByteStartIndex!,
+        entity.codeByteEndIndex!,
         false
       )
     }

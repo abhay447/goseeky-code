@@ -8,14 +8,26 @@ export class SarvamProvider implements AIProvider {
 
   constructor(private apiKey: string) {}
 
-  async chat(messages: ChatMessage[], options: ChatOptions = {}): Promise<string> {
-    const body = JSON.stringify({
-      model: this.model,
-      messages,
-      temperature: options.temperature ?? 0.2,
-      // max_tokens: options.maxTokens ?? 2048,
-      stream: false,
-    });
+  async chat(messages: ChatMessage[], options: ChatOptions = {}, responseFormat: any| undefined = null): Promise<string> {
+  const body: any = {
+    model: this.model,
+    messages,
+    temperature: options.temperature ?? 0.2,
+    stream: false,
+  };
+
+  if (responseFormat) {
+    body.response_format = {
+      type: "json_schema",
+      json_schema: {
+        name: "agent_response",
+        schema: responseFormat,
+        strict: true, // 🔥 important
+      },
+    };
+  }
+
+  const finalBody = JSON.stringify(body);
 
     return new Promise((resolve, reject) => {
       const req = https.request(
@@ -26,7 +38,7 @@ export class SarvamProvider implements AIProvider {
           headers: {
             "Content-Type": "application/json",
             "api-subscription-key": this.apiKey,
-            "Content-Length": Buffer.byteLength(body),
+            "Content-Length": Buffer.byteLength(finalBody),
           },
         },
         (res) => {
@@ -49,7 +61,7 @@ export class SarvamProvider implements AIProvider {
         }
       );
       req.on("error", reject);
-      req.write(body);
+      req.write(finalBody);
       req.end();
     });
   }

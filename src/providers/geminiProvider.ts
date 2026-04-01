@@ -8,7 +8,7 @@ export class GeminiProvider implements AIProvider {
 
   constructor(private apiKey: string) {}
 
-  async chat(messages: ChatMessage[], options: ChatOptions = {}): Promise<string> {
+  async chat(messages: ChatMessage[], options: ChatOptions = {},responseFormat: any| undefined = null): Promise<string> {
     // Convert messages to Gemini format
     // Gemini uses "user"/"model" roles, and system prompt is separate
     const systemMessage = messages.find(m => m.role === "system");

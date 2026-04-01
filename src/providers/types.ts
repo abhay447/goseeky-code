@@ -10,7 +10,7 @@ export interface ChatOptions {
 
 export interface AIProvider {
   name: string;
-  chat(messages: ChatMessage[], options?: ChatOptions): Promise<string>;
+  chat(messages: ChatMessage[], options?: ChatOptions, responseFormat?: any | undefined): Promise<string>;
 }
 
 export interface ChatHistoryRecord {

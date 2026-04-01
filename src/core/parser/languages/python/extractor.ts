@@ -35,8 +35,8 @@ export class PythonExtractor {
                         name: className,
                         type: "class",
                         filePath,
-                        startIndex: node.startIndex,
-                        endIndex: node.endIndex,
+                        codeByteStartIndex: node.startIndex,
+                        codeByteEndIndex: node.endIndex,
                         code : extractCodeSnippet(code,node.startIndex,node.endIndex)
                     });
 
@@ -65,8 +65,8 @@ export class PythonExtractor {
                         name: fullName,
                         type: currentClass ? "method" : "function",
                         filePath,
-                        startIndex: node.startIndex,
-                        endIndex: node.endIndex,
+                        codeByteStartIndex: node.startIndex,
+                        codeByteEndIndex: node.endIndex,
                         code : extractCodeSnippet(code,node.startIndex,node.endIndex)
                     });
 
@@ -99,8 +99,8 @@ export class PythonExtractor {
                             name,
                             type: "constant",
                             filePath,
-                        startIndex: node.startIndex,
-                        endIndex: node.endIndex,
+                        codeByteStartIndex: node.startIndex,
+                        codeByteEndIndex: node.endIndex,
                         code : extractCodeSnippet(code,node.startIndex,node.endIndex)
                         });
                     }

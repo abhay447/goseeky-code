@@ -5,7 +5,7 @@ import { AIProvider } from "../providers";
 import { ToolRegistry } from "../tools/toolRegistry";
 import { stringToSingleJsonBlock } from "../utils/jsonUtils";
 import { isStopped, resetStop } from "../webview/agentExecution";
-import { MultiStepAgent } from "./types";
+import { AgentNodeConfig, MultiStepAgent } from "./types";
 import { ChatHistoryManager } from "../providers/chatHistoryManager";
 import { getExtensionContextInfo } from "../tools/shellTools";
 
@@ -22,6 +22,18 @@ const AgentState = Annotation.Root({
   answer: Annotation<string>({ reducer: (_, b) => b, default: () => "" }),
   agentError: Annotation<string>({ reducer: (_, b) => b, default: () => "" }),
 });
+
+const PLANNER_RESPONSE_SCHEMA = {
+  type: "object",
+  properties: {
+    type: { enum: ["tool", "final"] },
+    reasoning: { type: "string" },
+    tool_name: { type: "string" },
+    arguments: { type: "object" },
+    answer: { type: "string" }
+  },
+  required: ["type", "reasoning", "tool_name", "arguments", "answer"]
+};
 
 type AgentStateType = typeof AgentState.State;
 
@@ -54,7 +66,7 @@ export class GoSeekyAgent implements MultiStepAgent {
   // ─────────────────────────────────────────
   // PLANNER NODE
   // ─────────────────────────────────────────
-  private plannerNode(config: any) {
+  private plannerNode(config: AgentNodeConfig) {
     return async (state: AgentStateType): Promise<Partial<AgentStateType>> => {
       const { client, toolRegistry, webviewView } = config;
 
@@ -76,13 +88,17 @@ export class GoSeekyAgent implements MultiStepAgent {
             { role: "user", content: userPrompt },
           ];
 
-          const reply: string = await (client as any).chat(messages);
+          const reply: string = await client.chat(messages, {}, PLANNER_RESPONSE_SCHEMA);
           webviewView.webview.postMessage({ type: "agentGoal", content: reply });
 
           const parsed = this.safeParseJSON(reply);
           if (!parsed.ok) {
             // retry
             lastError = parsed.error;
+            continue;
+          } else if (parsed.value.type === "final" && (!parsed.value.answer || parsed.value.answer.trim() === "")) {
+            // if it's a final response but answer is empty, that's also a parsing failure since it violates the contract of providing an answer when type=final
+            lastError = "Received final type but answer was empty.";
             continue;
           }
 
@@ -101,11 +117,13 @@ export class GoSeekyAgent implements MultiStepAgent {
   // ─────────────────────────────────────────
   // TOOL NODE
   // ─────────────────────────────────────────
-  private toolNode(config: any) {
+  private toolNode(config: AgentNodeConfig) {
     return async (state: AgentStateType): Promise<Partial<AgentStateType>> => {
       const { client, toolRegistry, webviewView } = config;
 
       if (isStopped()) return { answer: "STOPPED" };
+
+      console.log(JSON.stringify(state))
 
       try {
         const result = await toolRegistry.executeTool(
@@ -128,6 +146,7 @@ export class GoSeekyAgent implements MultiStepAgent {
           steps: (state.steps || 0) + 1,
         };
       } catch (e: any) {
+        console.log(e);
         return {
           agentError: e?.stack || "Tool failed",
           steps: (state.steps || 0) + 1,
@@ -139,7 +158,7 @@ export class GoSeekyAgent implements MultiStepAgent {
   // ─────────────────────────────────────────
   // FINAL NODE
   // ─────────────────────────────────────────
-  private finalNode(config: any) {
+  private finalNode(config: AgentNodeConfig) {
     return async (state: AgentStateType): Promise<Partial<AgentStateType>> => {
       const { webviewView } = config;
       const answer = state.decision?.answer || state.answer;
@@ -157,7 +176,7 @@ export class GoSeekyAgent implements MultiStepAgent {
   // ─────────────────────────────────────────
   // ERROR HANDLER NODE
   // ─────────────────────────────────────────
-  private errorHandlerNode(config: any) {
+  private errorHandlerNode(config: AgentNodeConfig) {
     return async (state: AgentStateType): Promise<Partial<AgentStateType>> => {
       const { webviewView } = config;
 
@@ -185,7 +204,7 @@ export class GoSeekyAgent implements MultiStepAgent {
   // ─────────────────────────────────────────
   // GRAPH
   // ─────────────────────────────────────────
-  private createGraph(config: any) {
+  private createGraph(config: AgentNodeConfig) {
     const graph = new StateGraph(AgentState)
       .addNode("planner", this.plannerNode(config))
       .addNode("tool", this.toolNode(config))
@@ -217,7 +236,7 @@ export class GoSeekyAgent implements MultiStepAgent {
   ): Promise<string> {
     resetStop();
 
-    const graph = this.createGraph({ client, toolRegistry, context, webviewView });
+    const graph = this.createGraph({ client, toolRegistry, webviewView });
 
     const result = await graph.invoke({
       query: userQuery,
@@ -274,11 +293,10 @@ export class GoSeekyAgent implements MultiStepAgent {
 
     
 
-     Response instructions:
+     Response INSTRUCTIONS:
       - STRICT JSON ONLY.
-      - NEVER RETURN PLAIN TEXT, XML, HTML.
-      - Use type=final if you want to return the answer to the user and no tool calls are pending. 
-      - Any tool_name and args should be ignored if type=final, only answer and reasoning will be considered by the system.
+      - DO NOT RETURN "final" if there are still pending tool calls to be made/actions to be taken, even if you already know the final answer. Always complete all necessary tool calls first before returning a final response.
+      - Any tool_name and arguments should be ignored if type=final, only answer and reasoning will be considered by the system.
       - DO NOT SendToUser with final since incase of final only answer and reasoning is expected, tool_name and arguments will be ignored by the system.
 
     `;
@@ -288,10 +306,10 @@ export class GoSeekyAgent implements MultiStepAgent {
     return `
 You are an expert coding agent.
 
-RESPONSE FORMAT — CRITICAL:
+RESPONSE INSTRUCTIONS — CRITICAL:
 - Your ENTIRE response must be a single raw JSON object.
 - Do NOT wrap it in markdown fences (\`\`\`json ... \`\`\`).
-- Do NOT include any XML tags, chain-of-thought, preamble, or explanation outside the JSON.
+- Do NOT include any explanation outside the JSON.
 - Do NOT include any text before or after the JSON object.
 - The response must be directly parseable by JSON.parse() with no preprocessing.
 
@@ -310,8 +328,9 @@ ${toolRegistry.listToolsPrompt()}
 RULES:
 - Use "type": "tool" when you need to call a tool to make progress.
 - Use "type": "final" when you have enough information to answer the user.
-- Never invent tool names. Only use tools listed above.
-- Never output XML. Never output markdown. Raw JSON only.
+- DO NOT RETURN "final" if there are still pending tool calls to be made/actions to be taken, even if you already know the final answer. Always complete all necessary tool calls first before returning a final response.
+- Never invent tool_names. Only use tool_names listed above.
+- Raw JSON only.
 - Always use exact path mentioned below while generating filesystem paths using the context info. Do not make up or assume any paths. Always use the provided context info for paths.
 ${JSON.stringify(getExtensionContextInfo(), null, 2)}
   `.trim();

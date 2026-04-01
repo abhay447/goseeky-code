@@ -14,3 +14,9 @@ export interface MultiStepAgent {
         webviewView: vscode.WebviewView
     ): Promise<string>;
 }
+
+export interface AgentNodeConfig {
+    client: AIProvider;
+    toolRegistry: ToolRegistry;
+    webviewView: vscode.WebviewView;
+}
